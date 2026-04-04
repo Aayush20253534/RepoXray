@@ -1,25 +1,26 @@
 import os
 import json
 import uuid
-from fastapi import FastAPI, Depends, HTTPException, status
+import asyncio
+from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
-from sqlalchemy.orm import Session
-import auth
-from database import SessionLocal
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from Repo_clone import get_repo_status, start_clone_job
-import schemas
-from schemas import UserCreate, IngestRequest
+from sqlalchemy.orm import Session
 from jose import JWTError, jwt
-import models
 from dotenv import load_dotenv
+
+import auth
+import models
+import schemas
+from database import SessionLocal
+from schemas import UserCreate, IngestRequest
+from Repo_clone import get_repo_status, start_clone_job
 
 load_dotenv()
 
 app = FastAPI(
     title="Explain My Codebase API",
-    description="Database-backed repository ingestion API."
+    description="Database-backed repository ingestion API with real-time WebSocket tracking."
 )
 
 app.add_middleware(
@@ -66,19 +67,10 @@ def signup(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
 @app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = auth.authenticate_user(db, form_data.username, form_data.password)
-    
     access_token = auth.create_access_token(
         data={"sub": user.username, "user_id": user.id}
     )
-    
-    return {
-        "access_token": access_token,
-        "token_type": "bearer"
-    }
-
-@app.get("/health")
-async def health_check():
-    return {"status": "ok", "database": "connected"}
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/api/ingest")
 async def ingest_repository(
@@ -100,23 +92,53 @@ async def ingest_repository(
     return {
         "status": "queued",
         "repo_id": repo_id,
-        "status_endpoint": f"/api/status/{repo_id}",
+        "websocket_endpoint": f"ws://localhost:8000/api/ws/status/{repo_id}",
         "tree_endpoint": f"/api/tree/{repo_id}",
-        "graph_endpoint": f"/api/graph/{repo_id}" # <-- ADDED HELPER LINK
+        "graph_endpoint": f"/api/graph/{repo_id}" 
     }
 
-@app.get("/api/status/{repo_id}")
-async def check_repo_status(
-    repo_id: str,
-    current_user: models.User = Depends(get_current_user)
+# --- REAL-TIME WEBSOCKET STATUS TRACKER ---
+@app.websocket("/api/ws/status/{repo_id}")
+async def repo_status_ws(
+    websocket: WebSocket, 
+    repo_id: str, 
+    token: str, # Passed as a query param since browser WebSockets can't send auth headers easily
+    db: Session = Depends(get_db)
 ):
-    status = get_repo_status(repo_id, current_user.id)
-    if status.get("status") == "not_found":
-        raise HTTPException(status_code=404, detail="Repository not found or unauthorized")
-    return status
+    await websocket.accept()
+    try:
+        # 1. Authenticate the WebSocket connection manually
+        payload = jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+        username: str = payload.get("sub")
+        user = db.query(models.User).filter(models.User.username == username).first()
+        
+        if not user:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
 
+        # 2. Start checking and pushing status updates
+        last_status = None
+        while True:
+            status_info = get_repo_status(repo_id, user.id)
+            current_status = status_info.get("status")
+            
+            # Only send a message if the status actually changed to save bandwidth
+            if current_status != last_status:
+                await websocket.send_json(status_info)
+                last_status = current_status
+            
+            # Close connection automatically if the pipeline finishes or fails
+            if current_status in ["success", "error", "not_found"]:
+                break
+                
+            await asyncio.sleep(2) # Server-side delay, taking the load off the frontend
+            
+    except JWTError:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+    except WebSocketDisconnect:
+        print(f"[WS] Client disconnected from repo {repo_id}")
 
-# --- ENDPOINT 1: THE FLAT TREE (AVAILABLE AT 'tree_ready') ---
+# --- ENDPOINT 1: THE FLAT TREE ---
 @app.get("/api/tree/{repo_id}")
 async def get_repo_tree(
     repo_id: str,
@@ -126,7 +148,6 @@ async def get_repo_tree(
     if status_info.get("status") == "not_found":
         raise HTTPException(status_code=404, detail="Repository not found or unauthorized.")
     
-    # Allow fetching if Pass 1 is done (tree_ready) OR if the whole pipeline is done (success)
     if status_info.get("status") not in ["tree_ready", "success"]:
         raise HTTPException(
             status_code=400, 
@@ -134,22 +155,16 @@ async def get_repo_tree(
         )
 
     file_path = os.path.join("Repo_Codes_data", f"{repo_id}.json")
-    
     if not os.path.exists(file_path):
-        raise HTTPException(
-            status_code=500, 
-            detail="Database says tree is ready, but the JSON file is missing from the server."
-        )
+        raise HTTPException(status_code=500, detail="Tree JSON file is missing from the server.")
         
     try:
         with open(file_path, "r", encoding="utf-8") as f:
-            tree_data = json.load(f)
-        return tree_data
+            return json.load(f)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading tree data: {str(e)}")
 
-
-# --- NEW ENDPOINT 2: THE COMPLETE GRAPH (AVAILABLE AT 'success') ---
+# --- ENDPOINT 2: THE COMPLETE GRAPH ---
 @app.get("/api/graph/{repo_id}")
 async def get_repo_graph(
     repo_id: str,
@@ -159,7 +174,6 @@ async def get_repo_graph(
     if status_info.get("status") == "not_found":
         raise HTTPException(status_code=404, detail="Repository not found or unauthorized.")
     
-    # Strict check: the graph is only ready when Gemini Pass 2 finishes completely
     if status_info.get("status") != "success":
         raise HTTPException(
             status_code=400, 
@@ -167,20 +181,14 @@ async def get_repo_graph(
         )
 
     file_path = os.path.join("Repo_Codes_data", f"{repo_id}_graph.json")
-    
     if not os.path.exists(file_path):
-        raise HTTPException(
-            status_code=500, 
-            detail="Database says success, but the graph JSON file is missing from the server."
-        )
+        raise HTTPException(status_code=500, detail="Graph JSON file is missing from the server.")
         
     try:
         with open(file_path, "r", encoding="utf-8") as f:
-            graph_data = json.load(f)
-        return graph_data
+            return json.load(f)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading graph data: {str(e)}")
-
 
 if __name__ == "__main__":
     import uvicorn
