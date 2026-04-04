@@ -7,6 +7,9 @@ from typing import Dict
 from database import SessionLocal
 from models import Repository  # Importing the new unified table
 
+# Import the X-ray function we created earlier
+from RepoXray import run_repo_xray 
+
 # Base directory where cloned repos will be stored
 REPOS_BASE_DIR = os.path.join(os.path.dirname(__file__), "cloned_repos")
 
@@ -15,7 +18,6 @@ def ensure_base_directory():
 
 def get_repo_clone_path(repo_id: str) -> Path:
     return Path(REPOS_BASE_DIR) / repo_id
-
 
 def remove_git_metadata(clone_path: Path) -> None:
     """Remove .git metadata from a cloned repository for safety."""
@@ -44,7 +46,7 @@ def update_job_status(repo_id: str, status: str, message: str, clone_path: str =
         db.close()
 
 def clone_repository(github_url: str, repo_id: str) -> None:
-    """Clones a repository and updates the Repository table at each step."""
+    """Clones a repository, cleans it, runs the X-ray, and updates the table at each step."""
     ensure_base_directory()
     clone_path = get_repo_clone_path(repo_id)
     clone_path_str = str(clone_path)
@@ -63,7 +65,7 @@ def clone_repository(github_url: str, repo_id: str) -> None:
     try:
         # Clone the repository
         result = subprocess.run(
-            ["git", "clone", github_url, clone_path_str],
+            ["git", "clone", "--depth", "1", github_url, clone_path_str], # Kept --depth 1 for speed
             capture_output=True,
             text=True,
             timeout=300
@@ -71,6 +73,8 @@ def clone_repository(github_url: str, repo_id: str) -> None:
         
         if result.returncode == 0:
             print(f"[CLONE] Successfully cloned {github_url}")
+            
+            # 1. Clean up .git metadata
             try:
                 remove_git_metadata(clone_path)
             except Exception as cleanup_error:
@@ -78,7 +82,22 @@ def clone_repository(github_url: str, repo_id: str) -> None:
                 update_job_status(repo_id, "error", f"Repository cloned, but .git cleanup failed: {cleanup_error}", clone_path_str)
                 return
 
-            update_job_status(repo_id, "success", "Repository cloned successfully and .git metadata removed", clone_path_str)
+            # 2. Run Repo X-Ray
+            try:
+                update_job_status(repo_id, "analyzing", "Clone successful. Running Codebase X-Ray...", clone_path_str)
+                print(f"[X-RAY] Starting analysis for {repo_id}")
+                
+                # Triggers the parsing and saves JSON to Repo_Codes_data
+                run_repo_xray(repo_id, clone_path_str, output_dir="./Repo_Codes_data")
+                
+                # 3. Mark as completely successful
+                update_job_status(repo_id, "success", "Repository cloned, cleaned, and analyzed successfully.", clone_path_str)
+                print(f"[SUCCESS] Pipeline complete for {repo_id}")
+                
+            except Exception as xray_error:
+                print(f"[X-RAY ERROR] Analysis failed for {repo_id}: {xray_error}")
+                update_job_status(repo_id, "error", f"Clone succeeded, but X-Ray analysis failed: {xray_error}", clone_path_str)
+
         else:
             print(f"[CLONE] Error cloning {github_url}: {result.stderr}")
             update_job_status(repo_id, "error", result.stderr.strip() or "Git clone failed", clone_path_str)
