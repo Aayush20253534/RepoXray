@@ -16,6 +16,8 @@ from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 import auth
 import models
+from dotenv import load_dotenv
+load_dotenv()
 
 
 app = FastAPI(
@@ -48,14 +50,14 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     try:
         # Decode the JWT token
         payload = jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
+        username: str = payload.get("sub")
+        if username is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
     
     # Fetch the user from the database
-    user = db.query(models.User).filter(models.User.email == email).first()
+    user = db.query(models.User).filter(models.User.username == username).first()
     if user is None:
         raise credentials_exception
     return user
@@ -70,7 +72,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     user = auth.authenticate_user(db, form_data.username, form_data.password)
     
     access_token = auth.create_access_token(
-        data={"sub": user.email, "user_id": user.id}
+        data={"sub": user.username, "user_id": user.id}
     )
     
     return {
