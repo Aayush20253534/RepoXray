@@ -7,9 +7,10 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from models import User  # Ensure this points to your models.py
 from schemas import UserCreate
+import uuid
 
 # Configuration
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-super-secret-key")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "f6663a10309d17e0849e063c6148c023c1c423f8d5d70014bc0d3c90357f1297")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -30,7 +31,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 def register_user(db: Session, user_data: UserCreate):
     # Check if username already exists
     existing_user = db.query(User).filter(
-        (User.username == user_data.username) | (User.email == user_data.email)
+        (User.username == user_data.username)
     ).first()
     if existing_user:
         raise HTTPException(
@@ -41,12 +42,12 @@ def register_user(db: Session, user_data: UserCreate):
     hashed_pwd = hash_password(user_data.password)
     
     # Matching your User model: id (auto), user_id (string/UUID), name, username, hashed_password
-    import uuid
+    
     new_user = User(
         user_id=str(uuid.uuid4()),
         name=user_data.name,
         username=user_data.username,
-        email=user_data.email,
+        # email=user_data.email,
         hashed_password=hashed_pwd
     )
     db.add(new_user)
@@ -56,7 +57,7 @@ def register_user(db: Session, user_data: UserCreate):
 
 def authenticate_user(db: Session, identifier: str, password: str):
     user = db.query(User).filter(
-        (User.username == identifier) | (User.email == identifier)
+        (User.username == identifier)
     ).first()
     
     if not user or not verify_password(password, user.hashed_password):

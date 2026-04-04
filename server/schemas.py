@@ -7,7 +7,7 @@ class IngestRequest(BaseModel):
 class UserCreate(BaseModel):
     name: str
     username: str
-    email: EmailStr
+    # email: EmailStr
     password: str = Field(..., min_length=8, max_length=72)
 
 class UserLogin(BaseModel):
@@ -19,7 +19,7 @@ class UserOut(BaseModel):
     id: int
     user_id: str
     username: str
-    email: EmailStr
+    # email: EmailStr
 
     class Config:
         from_attributes = True

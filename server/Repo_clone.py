@@ -1,16 +1,18 @@
 import os
 import stat
 import time
+import uuid
 import subprocess
 import threading
 import shutil
 from pathlib import Path
 from typing import Dict
 from database import SessionLocal
-from models import Repository  # Importing the new unified table
+from models import Repository  
 
-# Import the X-ray function we created earlier
+# Import the X-ray functions
 from repo_tree import run_repo_xray 
+from dependency_graph import build_dependency_graph  # <-- ADDED NEW PASS 2 FUNCTION
 
 # Base directory where cloned repos will be stored
 REPOS_BASE_DIR = os.path.join(os.path.dirname(__file__), "cloned_repos")
@@ -70,7 +72,7 @@ def update_job_status(repo_id: str, status: str, message: str, clone_path: str =
         db.close()
 
 def clone_repository(github_url: str, repo_id: str) -> None:
-    """Clones a repository, cleans it, runs the X-ray, and updates the table at each step."""
+    """Clones a repository, cleans it, runs the two-pass X-ray, and updates the table at each step."""
     ensure_base_directory()
     clone_path = get_repo_clone_path(repo_id)
     clone_path_str = str(clone_path)
@@ -89,7 +91,7 @@ def clone_repository(github_url: str, repo_id: str) -> None:
     try:
         # Clone the repository
         result = subprocess.run(
-            ["git", "clone", "--depth", "1", github_url, clone_path_str], # Kept --depth 1 for speed
+            ["git", "clone", "--depth", "1", github_url, clone_path_str],
             capture_output=True,
             text=True,
             timeout=300
@@ -106,21 +108,28 @@ def clone_repository(github_url: str, repo_id: str) -> None:
                 update_job_status(repo_id, "error", f"Repository cloned, but .git cleanup failed: {cleanup_error}", clone_path_str)
                 return
 
-            # 2. Run Repo X-Ray
+            # --- START AI PIPELINE ---
             try:
-                update_job_status(repo_id, "analyzing", "Clone successful. Running Codebase X-Ray...", clone_path_str)
-                print(f"[X-RAY] Starting analysis for {repo_id}")
+                # 2. Run Repo X-Ray (PASS 1: Groq extracts nodes)
+                update_job_status(repo_id, "analyzing_tree", "Clone successful. Extracting files and generating directory tree...", clone_path_str)
+                print(f"[X-RAY] Starting Pass 1 for {repo_id}")
                 
-                # Triggers the parsing and saves JSON to Repo_Codes_data
                 run_repo_xray(repo_id, clone_path_str, output_dir="./Repo_Codes_data")
                 
-                # 3. Mark as completely successful
-                update_job_status(repo_id, "success", "Repository cloned, cleaned, and analyzed successfully.", clone_path_str)
+                # ---> CRITICAL UPDATE: Signal frontend that the flat Tree is ready! <---
+                update_job_status(repo_id, "tree_ready", "Directory tree complete! Mapping complex dependencies...", clone_path_str)
+                
+                # 3. Map Dependencies (PASS 2: Gemini connects the edges)
+                print(f"[X-RAY] Starting Pass 2 for {repo_id}")
+                build_dependency_graph(repo_id, data_dir="./Repo_Codes_data")
+                
+                # 4. Mark as completely successful
+                update_job_status(repo_id, "success", "Repository completely analyzed and mapped.", clone_path_str)
                 print(f"[SUCCESS] Pipeline complete for {repo_id}")
                 
             except Exception as xray_error:
                 print(f"[X-RAY ERROR] Analysis failed for {repo_id}: {xray_error}")
-                update_job_status(repo_id, "error", f"Clone succeeded, but X-Ray analysis failed: {xray_error}", clone_path_str)
+                update_job_status(repo_id, "error", f"Clone succeeded, but AI analysis failed: {xray_error}", clone_path_str)
 
         else:
             print(f"[CLONE] Error cloning {github_url}: {result.stderr}")
@@ -143,7 +152,7 @@ def start_clone_job(github_url: str, repo_id: str, owner_id: int) -> Dict[str, s
         
         new_repo = Repository(
             id=repo_id,
-            owner_id=owner_id, # <--- Link to the user who requested it
+            owner_id=owner_id, 
             github_url=github_url,
             repo_name=repo_name,
             status="queued",
@@ -158,7 +167,6 @@ def start_clone_job(github_url: str, repo_id: str, owner_id: int) -> Dict[str, s
     finally:
         db.close()
 
-    # The rest of this function remains exactly the same
     worker = threading.Thread(
         target=clone_repository,
         args=(github_url, repo_id),
@@ -177,7 +185,6 @@ def get_repo_status(repo_id: str, owner_id: int) -> Dict[str, str]:
     """Queries the Repository table for the current status, verifying ownership."""
     db = SessionLocal()
     try:
-        # Check BOTH the repo_id and the owner_id so users can't snoop on other users' repos
         repo = db.query(Repository).filter(
             Repository.id == repo_id, 
             Repository.owner_id == owner_id
@@ -199,3 +206,28 @@ def get_repo_status(repo_id: str, owner_id: int) -> Dict[str, str]:
         }
     finally:
         db.close()
+
+if __name__ == "__main__":
+    import time # Needed for the test block
+    
+    test_github_url = "https://github.com/octocat/Hello-World.git"
+    test_repo_id = str(uuid.uuid4())
+    test_owner_id = 1  
+    
+    print(f"--- Starting Test for Repo Clone ---")
+    
+    try:
+        job_info = start_clone_job(test_github_url, test_repo_id, test_owner_id)
+        
+        while True:
+            status_info = get_repo_status(test_repo_id, test_owner_id)
+            current_status = status_info.get("status")
+            print(f"[{current_status.upper()}] {status_info.get('message')}")
+            
+            if current_status in ["success", "error", "not_found"]:
+                break
+                
+            time.sleep(3)
+            
+    except Exception as e:
+        print(f"\nTest failed with exception: {e}")
