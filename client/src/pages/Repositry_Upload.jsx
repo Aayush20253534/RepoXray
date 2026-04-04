@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Github,
+  
+  Search,
   FolderTree,
   BotMessageSquare,
   Network,
@@ -21,6 +22,7 @@ import {
   Code2,
   AlignLeft,
 } from 'lucide-react';
+import * as Icons from "lucide-react";
 import Sidebar from '../components/sidebar';
 
 // ==========================
@@ -265,7 +267,7 @@ const UploadStage = ({ repoUrl, setRepoUrl, onAnalyze }) => {
               </div>
 
               <div className="relative">
-                <Github className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-500" />
+                <Icons.GitBranch  className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-500" />
                 <input
                   value={repoUrl}
                   onChange={(e) => setRepoUrl(e.target.value)}
