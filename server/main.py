@@ -116,31 +116,6 @@ async def get_file_code(
         raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
 
 
-@app.post("/summarize")
-def summarize(request: SummaryRequest):
-    try:
-        result = summarize_file(
-            user_id=request.user_id,
-            repo_clone=request.repo_clone,
-            file_path=request.file_path,
-        )
-        return result
-
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/summaries")
-def get_all_summaries():
-    """Fetch all cached summaries from uuid_summary.json."""
-    if not os.path.exists("uuid_summary.json"):
-        return {"summaries": {}}
-    with open("uuid_summary.json") as f:
-        all_data = json.load(f)
-    return {"summaries": all_data}  # returns { "main.py": "summary...", ... }
-
 @app.post("/signup", status_code=status.HTTP_201_CREATED)
 def signup(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     user = auth.register_user(db, user_in)
