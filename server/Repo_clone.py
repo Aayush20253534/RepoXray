@@ -1,4 +1,6 @@
 import os
+import stat
+import time
 import subprocess
 import threading
 import shutil
@@ -19,13 +21,35 @@ def ensure_base_directory():
 def get_repo_clone_path(repo_id: str) -> Path:
     return Path(REPOS_BASE_DIR) / repo_id
 
+
+def _handle_remove_readonly(func, path, exc_info):
+    """shutil.rmtree callback to handle read-only files on Windows."""
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        raise exc_info[1]
+
 def remove_git_metadata(clone_path: Path) -> None:
     """Remove .git metadata from a cloned repository for safety."""
     git_path = clone_path / ".git"
 
     if git_path.is_dir():
-        shutil.rmtree(git_path)
+        # Retry a few times because antivirus/indexers can briefly lock files on Windows.
+        last_error = None
+        for _ in range(3):
+            try:
+                shutil.rmtree(git_path, onerror=_handle_remove_readonly)
+                last_error = None
+                break
+            except PermissionError as err:
+                last_error = err
+                time.sleep(0.25)
+
+        if last_error is not None and git_path.exists():
+            raise last_error
     elif git_path.exists() or git_path.is_symlink():
+        os.chmod(git_path, stat.S_IWRITE)
         git_path.unlink()
 
 def update_job_status(repo_id: str, status: str, message: str, clone_path: str = "") -> None:
