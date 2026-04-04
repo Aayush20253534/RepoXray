@@ -10,7 +10,7 @@ from jose import JWTError, jwt
 from dotenv import load_dotenv
 import models
 from database import engine
-
+from pydantic import BaseModel
 import auth
 import models
 import schemas
@@ -81,28 +81,22 @@ def summarize(request: SummaryRequest):
             repo_clone=request.repo_clone,
             file_path=request.file_path,
         )
-        return {
-            "success": True,
-            "cached": result["cached"],
-            "id": result["id"],
-            "file_path": request.file_path,
-            "summary": result["summary"],
-        }
+        return result
+
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/summaries/{user_id}")
-def get_user_summaries(user_id: str):
-    """Fetch all cached summaries for a given user."""
-    import json, os
+
+@app.get("/summaries")
+def get_all_summaries():
+    """Fetch all cached summaries from uuid_summary.json."""
     if not os.path.exists("uuid_summary.json"):
-        return {"summaries": []}
+        return {"summaries": {}}
     with open("uuid_summary.json") as f:
         all_data = json.load(f)
-    user_entries = [v for v in all_data.values() if v.get("user_id") == user_id]
-    return {"summaries": user_entries}
+    return {"summaries": all_data}  # returns { "main.py": "summary...", ... }
 
 @app.post("/signup", status_code=status.HTTP_201_CREATED)
 def signup(user_in: schemas.UserCreate, db: Session = Depends(get_db)):

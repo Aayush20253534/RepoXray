@@ -56,6 +56,7 @@ Now analyze the following file:
 {code_here}
 """
 
+
 def load_summaries() -> dict:
     if os.path.exists(SUMMARY_FILE):
         with open(SUMMARY_FILE, "r") as f:
@@ -68,18 +69,13 @@ def save_summaries(data: dict):
         json.dump(data, f, indent=2)
 
 
-def get_cache_key(user_id: str, repo_clone: str, file_path: str) -> str:
-    return f"{user_id}::{repo_clone}::{file_path}"
-
-
 def summarize_file(user_id: str, repo_clone: str, file_path: str) -> dict:
     summaries = load_summaries()
-    cache_key = get_cache_key(user_id, repo_clone, file_path)
+    file_name = Path(file_path).name
 
     # Return cached summary if exists
-    for entry in summaries.values():
-        if entry.get("cache_key") == cache_key:
-            return {"summary": entry["summary"], "cached": True, "id": entry["id"]}
+    if file_name in summaries:
+        return {"summary": summaries[file_name], "cached": True}
 
     # Read the actual file
     full_path = Path(repo_clone) / file_path
@@ -88,7 +84,6 @@ def summarize_file(user_id: str, repo_clone: str, file_path: str) -> dict:
 
     code_content = full_path.read_text(encoding="utf-8", errors="ignore")
 
-    # Call Groq LLM
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
@@ -102,16 +97,9 @@ def summarize_file(user_id: str, repo_clone: str, file_path: str) -> dict:
 
     summary_text = response.choices[0].message.content.strip()
 
-    # Persist to uuid_summary.json
-    entry_id = str(uuid.uuid4())
-    summaries[entry_id] = {
-        "id": entry_id,
-        "cache_key": cache_key,
-        "user_id": user_id,
-        "repo_clone": repo_clone,
-        "file_path": file_path,
-        "summary": summary_text,
-    }
+    # Save as { "main.py": "summary text..." }
+    summaries[file_name] = summary_text
     save_summaries(summaries)
 
-    return {"summary": summary_text, "cached": False, "id": entry_id}
+    return {"summary": summary_text, "cached": False}
+
