@@ -717,12 +717,48 @@ const getInsights = (file) =>
   
 const FilePreviewModal = ({ file, viewMode, setViewMode, onClose }) => {
   if (!file) return null;
+const overview = getOverview(file);
+const responsibilities = getResponsibilities(file);
+const insights = getInsights(file);
+const codeLines = file.code?.split('\n').length || 0;
 
-  const overview = getOverview(file);
-  const responsibilities = getResponsibilities(file);
-  const insights = getInsights(file);
-  const codeLines = file.code?.split('\n').length || 0;
+const [question, setQuestion] = useState('');
+const [submittedQuestion, setSubmittedQuestion] = useState('');
+const [showAnswer, setShowAnswer] = useState(false);
 
+const generatedAnswer = useMemo(() => {
+  if (!submittedQuestion.trim()) return '';
+
+  const q = submittedQuestion.toLowerCase();
+
+  if (q.includes('what does this file do') || q.includes('purpose') || q.includes('what is this')) {
+    return overview;
+  }
+
+  if (q.includes('responsibil') || q.includes('tasks') || q.includes('role')) {
+    return responsibilities.join(' • ');
+  }
+
+  if (q.includes('important') || q.includes('why') || q.includes('insight')) {
+    return insights;
+  }
+
+  if (q.includes('summary') || q.includes('one line')) {
+    return file.summary;
+  }
+
+  if (q.includes('code') || q.includes('lines')) {
+    return `${file.name} contains approximately ${codeLines} lines of code in this preview and is part of the repository intelligence flow.`;
+  }
+
+  return `Based on this file, ${file.name} is mainly responsible for ${file.summary.toLowerCase()} ${overview}`;
+}, [submittedQuestion, overview, responsibilities, insights, file, codeLines]);
+
+const handleAsk = () => {
+  if (!question.trim()) return;
+  setSubmittedQuestion(question);
+  setShowAnswer(true);
+};
   return (
     <AnimatePresence>
       <motion.div
@@ -849,15 +885,98 @@ const FilePreviewModal = ({ file, viewMode, setViewMode, onClose }) => {
                           ))}
                         </ul>
                       </div>
+<div className="rounded-xl border border-white/6 bg-white/[0.03] p-4">
+  <div className="mb-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
+    Insights
+  </div>
+  <p className="text-sm text-neutral-300">
+    {insights}
+  </p>
+</div>
 
-                      <div className="rounded-xl border border-white/6 bg-white/[0.03] p-4">
-                        <div className="mb-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
-                          Insights
-                        </div>
-                        <p className="text-sm text-neutral-300">
-                          {insights}
-                        </p>
-                      </div>
+<div className="overflow-hidden rounded-2xl border border-cyan-500/15 bg-[linear-gradient(180deg,rgba(34,211,238,0.07),rgba(255,255,255,0.02))]">
+  <div className="border-b border-white/8 px-4 py-3">
+    <div className="flex items-center gap-3">
+      <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-500/10">
+        <Search className="h-4 w-4 text-cyan-300" />
+      </div>
+
+      <div className="min-w-0">
+        <div className="text-sm font-semibold text-white">Ask about this file</div>
+        <div className="text-xs text-neutral-400">
+          Type a question and press Enter or click Ask
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div className="p-4">
+    <div className="flex flex-col gap-3 md:flex-row">
+      <div className="relative flex-1">
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+        <input
+          type="text"
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleAsk();
+            }
+          }}
+          placeholder="What does this file do? Why is it important? What are its responsibilities?"
+          className="w-full rounded-2xl border border-white/10 bg-[#0b0f17] py-3.5 pl-11 pr-4 text-sm text-white outline-none transition-all placeholder:text-neutral-500 focus:border-cyan-400/40 focus:ring-2 focus:ring-cyan-500/20"
+        />
+      </div>
+
+      <button
+        type="button"
+        onClick={handleAsk}
+        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-5 py-3 text-sm font-semibold text-cyan-300 transition-all hover:border-cyan-300/40 hover:bg-cyan-500/15 hover:text-white"
+      >
+        <ArrowRight className="h-4 w-4" />
+        Ask
+      </button>
+    </div>
+
+    <div className="mt-3 flex flex-wrap gap-2">
+      {['What does this file do?', 'What are its responsibilities?', 'Why is it important?'].map((sample) => (
+        <button
+          key={sample}
+          type="button"
+          onClick={() => {
+            setQuestion(sample);
+            setSubmittedQuestion(sample);
+            setShowAnswer(true);
+          }}
+          className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-neutral-300 transition hover:border-cyan-400/30 hover:bg-cyan-500/10 hover:text-white"
+        >
+          {sample}
+        </button>
+      ))}
+    </div>
+
+    {showAnswer && submittedQuestion.trim() && (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mt-4 rounded-2xl border border-cyan-500/20 bg-[#0b1220] p-4 shadow-[0_0_24px_rgba(34,211,238,0.08)]"
+      >
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-300">
+            Answer
+          </div>
+          <div className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] text-neutral-400">
+            {file.name}
+          </div>
+        </div>
+
+        <p className="text-sm leading-7 text-neutral-200">
+          {generatedAnswer}
+        </p>
+      </motion.div>
+    )}
+  </div>
+</div>
                     </div>
                   </motion.div>
                 ) : (
@@ -1391,7 +1510,10 @@ export default function RepositoryIntelligencePage() {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:40px_40px] opacity-[0.08]" />
       </div>
 
-      <main className="relative z-10 ml-[78px] md:ml-[220px] transition-all duration-300">
+      <main
+  className="relative z-10 transition-all duration-300"
+  style={{ marginLeft: 'var(--sidebar-width, 78px)' }}
+>
         <div className="mx-auto max-w-7xl px-6 py-8 md:px-8 md:py-6">
           <AnimatePresence mode="wait">
             {stage === 'upload' && (

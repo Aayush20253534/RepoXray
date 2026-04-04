@@ -22,7 +22,10 @@ function App() {
           <div className="flex-1">
             <Routes>
               <Route path="/" element={<Navigate to="/Repositry_Upload" />} />
-              <Route path="/Repositry_Upload" element={<RepositoryUploadPage />} />
+              <Route
+  path="/Repositry_Upload"
+  element={<RepositoryUploadPage key={window.location.pathname + Date.now()} />}
+/>
             </Routes>
           </div>
 
