@@ -74,6 +74,55 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise credentials_exception
     return user
 
+# --- ENDPOINT 4: GET RAW FILE CODE ---
+@app.get("/api/file-code/{repo_id}")
+async def get_file_code(
+    repo_id: str,
+    file_path: str,  # e.g. "main.py" or "src/utils.py"
+    current_user: models.User = Depends(get_current_user)
+):
+    # 1. Check repo exists + belongs to this user + is ready
+    status_info = get_repo_status(repo_id, current_user.id)
+    
+    if status_info.get("status") == "not_found":
+        raise HTTPException(status_code=404, detail="Repository not found or unauthorized.")
+    
+    if status_info.get("status") not in ["tree_ready", "success", "error"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Repo not ready yet. Current status: {status_info.get('status')}"
+        )
+
+    # 2. Get clone path directly from DB (already stored by Repo_clone.py)
+    repo_clone_path = status_info.get("clone_path")
+    if not repo_clone_path:
+        raise HTTPException(status_code=500, detail="Clone path not found in database.")
+
+    # 3. Prevent path traversal attacks
+    full_path = os.path.realpath(os.path.join(repo_clone_path, file_path))
+    base_path = os.path.realpath(repo_clone_path)
+
+    if not full_path.startswith(base_path):
+        raise HTTPException(status_code=400, detail="Invalid file path.")
+
+    # 4. Read and return file
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail=f"File '{file_path}' not found in repo.")
+    
+    if not os.path.isfile(full_path):
+        raise HTTPException(status_code=400, detail=f"'{file_path}' is a directory, not a file.")
+
+    try:
+        code = open(full_path, "r", encoding="utf-8", errors="ignore").read()
+        return {
+            "repo_id": repo_id,
+            "file_path": file_path,
+            "code": code
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
+
+
 @app.post("/summarize")
 def summarize(request: SummaryRequest):
     try:
@@ -189,7 +238,7 @@ async def get_repo_tree(
     if status_info.get("status") == "not_found":
         raise HTTPException(status_code=404, detail="Repository not found or unauthorized.")
     
-    if status_info.get("status") not in ["tree_ready", "success"]:
+    if status_info.get("status") not in ["tree_ready", "success", "error"]:
         raise HTTPException(
             status_code=400, 
             detail=f"Tree data not ready yet. Current status: {status_info.get('status')}"
