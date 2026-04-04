@@ -16,6 +16,16 @@ def ensure_base_directory():
 def get_repo_clone_path(repo_id: str) -> Path:
     return Path(REPOS_BASE_DIR) / repo_id
 
+
+def remove_git_metadata(clone_path: Path) -> None:
+    """Remove .git metadata from a cloned repository for safety."""
+    git_path = clone_path / ".git"
+
+    if git_path.is_dir():
+        shutil.rmtree(git_path)
+    elif git_path.exists() or git_path.is_symlink():
+        git_path.unlink()
+
 def update_job_status(repo_id: str, status: str, message: str, clone_path: str = "") -> None:
     """Thread-safe database update for the Repository status."""
     db = SessionLocal()
@@ -61,7 +71,14 @@ def clone_repository(github_url: str, repo_id: str) -> None:
         
         if result.returncode == 0:
             print(f"[CLONE] Successfully cloned {github_url}")
-            update_job_status(repo_id, "success", "Repository cloned successfully", clone_path_str)
+            try:
+                remove_git_metadata(clone_path)
+            except Exception as cleanup_error:
+                print(f"[CLONE] Failed to remove .git metadata for {repo_id}: {cleanup_error}")
+                update_job_status(repo_id, "error", f"Repository cloned, but .git cleanup failed: {cleanup_error}", clone_path_str)
+                return
+
+            update_job_status(repo_id, "success", "Repository cloned successfully and .git metadata removed", clone_path_str)
         else:
             print(f"[CLONE] Error cloning {github_url}: {result.stderr}")
             update_job_status(repo_id, "error", result.stderr.strip() or "Git clone failed", clone_path_str)
