@@ -75,21 +75,62 @@ const TREE_DATA = [
         name: 'components',
         children: [
           {
-  type: 'file',
-  name: 'Sidebar.jsx',
-  summary: 'Renders the app sidebar with navigation controls and layout anchors.',
-  code: `export default function Sidebar() {
+            type: 'file',
+            name: 'Sidebar.jsx',
+            summary: 'Renders the app sidebar with navigation controls and layout anchors.',
+            overview:
+              'Sidebar.jsx defines the persistent navigation shell for the product and acts as the entry point for section-level movement across the interface.',
+            responsibilities: [
+              'Renders the sidebar navigation container and menu links',
+              'Supports layout anchoring for the main application shell',
+              'Improves navigation consistency across pages and views',
+            ],
+            insights:
+              'This file is foundational for interface structure because it stabilizes navigation behavior and keeps the overall experience modular and reusable.',
+            code: `export default function Sidebar() {
   return <aside>Sidebar</aside>;
 }`,
-},
+          },
         ],
       },
       {
         type: 'folder',
         name: 'pages',
         children: [
-          { type: 'file', name: 'RepositoryUploadPage.jsx' },
-          { type: 'file', name: 'RepositoryResultsPage.jsx' },
+          {
+            type: 'file',
+            name: 'RepositoryUploadPage.jsx',
+            summary: 'Handles repository URL input and starts the analysis flow.',
+            overview:
+              'RepositoryUploadPage.jsx is responsible for collecting the repository link, validating the user action, and initiating the analysis pipeline.',
+            responsibilities: [
+              'Accepts and validates repository URL input',
+              'Triggers the analysis flow and loading stage',
+              'Provides a clean launch point for repository scanning',
+            ],
+            insights:
+              'This page is conversion-critical because it transforms a simple link input into the product’s full repository intelligence experience.',
+            code: `export default function RepositoryUploadPage() {
+  return <div>Upload Page</div>;
+}`,
+          },
+          {
+            type: 'file',
+            name: 'RepositoryResultsPage.jsx',
+            summary: 'Displays repository analysis results using directory, summary, and dependency views.',
+            overview:
+              'RepositoryResultsPage.jsx organizes the post-analysis experience and surfaces the main intelligence outputs through a tab-based interface.',
+            responsibilities: [
+              'Displays repository insights across structured tabs',
+              'Connects directory tree, summaries, and dependency data',
+              'Provides an exploration surface for the analyzed repository',
+            ],
+            insights:
+              'This file acts as the insight dashboard layer, turning raw repository data into something visual, readable, and product-friendly.',
+            code: `export default function RepositoryResultsPage() {
+  return <div>Results Page</div>;
+}`,
+          },
         ],
       },
       {
@@ -102,7 +143,25 @@ const TREE_DATA = [
         name: 'utils',
         children: [],
       },
-      { type: 'file', name: 'App.jsx' },
+      {
+        type: 'file',
+        name: 'App.jsx',
+        summary: 'Top-level application shell that manages page routing and layout composition.',
+        overview:
+          'App.jsx defines the root interface composition and determines how the major pages and shared layout elements are stitched together.',
+        responsibilities: [
+          'Acts as the top-level application wrapper',
+          'Coordinates routing and page-level rendering',
+          'Maintains global layout structure and composition',
+        ],
+        insights:
+          'This is the architectural control point of the frontend, making it one of the most important files for maintainability and scalability.',
+        code: `function App() {
+  return <div>App</div>;
+}
+
+export default App;`,
+      },
     ],
   },
   {
@@ -110,8 +169,42 @@ const TREE_DATA = [
     name: 'public',
     children: [],
   },
-  { type: 'file', name: 'package.json' },
-  { type: 'file', name: 'vite.config.js' },
+  {
+    type: 'file',
+    name: 'package.json',
+    summary: 'Defines project metadata, scripts, and package dependencies.',
+    overview:
+      'package.json contains the project identity, execution scripts, and dependency contract required to run and build the application.',
+    responsibilities: [
+      'Declares project metadata and package identity',
+      'Defines scripts for development and build workflows',
+      'Tracks dependency versions required by the application',
+    ],
+    insights:
+      'This file is the dependency backbone of the project and directly affects reproducibility, tooling, and environment consistency.',
+    code: `{
+  "name": "repoxray"
+}`,
+  },
+  {
+    type: 'file',
+    name: 'vite.config.js',
+    summary: 'Configures the Vite build system and frontend tooling pipeline.',
+    overview:
+      'vite.config.js shapes how the frontend dev server, bundling, and environment behavior are configured during development and production.',
+    responsibilities: [
+      'Configures the Vite toolchain and plugins',
+      'Supports build-time and development-time behavior',
+      'Improves frontend performance and project setup clarity',
+    ],
+    insights:
+      'Though usually small, this file has high leverage because it influences how the entire frontend compiles, serves, and scales.',
+    code: `import { defineConfig } from 'vite';
+
+export default defineConfig({
+  plugins: [],
+});`,
+  },
 ];
 
 const getFileIcon = (name) => {
@@ -160,14 +253,14 @@ const TreeNode = ({ node, depth = 0, onFileClick }) => {
               className="overflow-hidden"
             >
               <div className="relative">
-               {node.children.map((child, index) => (
-  <TreeNode
-    key={`${child.name}-${index}-${depth + 1}`}
-    node={child}
-    depth={depth + 1}
-    onFileClick={onFileClick}
-  />
-))}
+                {node.children.map((child, index) => (
+                  <TreeNode
+                    key={`${child.name}-${index}-${depth + 1}`}
+                    node={child}
+                    depth={depth + 1}
+                    onFileClick={onFileClick}
+                  />
+                ))}
               </div>
             </motion.div>
           )}
@@ -178,17 +271,17 @@ const TreeNode = ({ node, depth = 0, onFileClick }) => {
 
   const FileIcon = getFileIcon(node.name);
 
-return (
-  <button
-    type="button"
-    onClick={() => onFileClick?.(node)}
-    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-neutral-400 transition-all hover:bg-white/[0.03] hover:text-white"
-    style={{ paddingLeft: paddingLeft + 28 }}
-  >
-    <FileIcon className="h-4 w-4 shrink-0 text-blue-300" />
-    <span className="truncate">{node.name}</span>
-  </button>
-);
+  return (
+    <button
+      type="button"
+      onClick={() => onFileClick?.(node)}
+      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-neutral-400 transition-all hover:bg-white/[0.03] hover:text-white"
+      style={{ paddingLeft: paddingLeft + 28 }}
+    >
+      <FileIcon className="h-4 w-4 shrink-0 text-blue-300" />
+      <span className="truncate">{node.name}</span>
+    </button>
+  );
 };
 
 const DirectoryExplorer = ({ onFileClick }) => {
@@ -201,17 +294,18 @@ const DirectoryExplorer = ({ onFileClick }) => {
 
       <div className="space-y-1">
         {TREE_DATA.map((node, index) => (
-  <TreeNode
-    key={`${node.name}-${index}`}
-    node={node}
-    depth={0}
-    onFileClick={onFileClick}
-  />
-))}
+          <TreeNode
+            key={`${node.name}-${index}`}
+            node={node}
+            depth={0}
+            onFileClick={onFileClick}
+          />
+        ))}
       </div>
     </div>
   );
 };
+
 // ==========================
 // Stage 1: Upload Page
 // ==========================
@@ -410,7 +504,7 @@ const LoadingBuffer = ({ onComplete }) => {
             />
 
             <div className="relative z-10 flex flex-col items-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05]">
                 <Orbit className="h-8 w-8 text-white" />
               </div>
               <div className="text-5xl font-bold text-white">{progress}%</div>
@@ -514,8 +608,28 @@ export default App;`,
   },
 ];
 
+const getOverview = (file) =>
+  file.overview ||
+  `${file.name} is a focused module in the repository that contributes to the overall application flow, keeps the project structure organized, and supports the user-facing repository intelligence experience.`;
+
+const getResponsibilities = (file) =>
+  file.responsibilities || [
+    `Supports the primary behavior expected from ${file.name}`,
+    'Maintains a clean separation between structure, logic, and presentation',
+    'Improves maintainability through modular and reusable implementation',
+  ];
+
+const getInsights = (file) =>
+  file.insights ||
+  `This file appears to play an important role in keeping the codebase modular, readable, and scalable. Its structure suggests a clean implementation approach suitable for iterative product development.`;
+
 const FilePreviewModal = ({ file, viewMode, setViewMode, onClose }) => {
   if (!file) return null;
+
+  const overview = getOverview(file);
+  const responsibilities = getResponsibilities(file);
+  const insights = getInsights(file);
+  const codeLines = file.code?.split('\n').length || 0;
 
   return (
     <AnimatePresence>
@@ -524,38 +638,58 @@ const FilePreviewModal = ({ file, viewMode, setViewMode, onClose }) => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/72 px-4 py-6 backdrop-blur-md"
       >
         <motion.div
-          initial={{ opacity: 0, y: 22, scale: 0.98 }}
+          initial={{ opacity: 0, y: 20, scale: 0.985 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 18, scale: 0.98 }}
-          transition={{ duration: 0.25 }}
-          className="relative w-full max-w-6xl overflow-hidden rounded-[30px] border border-white/10 bg-[#09090f] shadow-[0_0_60px_rgba(168,85,247,0.18)]"
+          exit={{ opacity: 0, y: 18, scale: 0.985 }}
+          transition={{ duration: 0.22 }}
+          className="relative w-full max-w-5xl overflow-hidden rounded-[24px] border border-white/10 bg-[#0a0a10] shadow-[0_20px_80px_rgba(0,0,0,0.45)]"
         >
-          <div className="border-b border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-6 py-4">
+          <div className="border-b border-white/8 bg-white/[0.03] px-5 py-4">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-purple-300">
+                <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-purple-300">
                   <FileText className="h-4 w-4" />
                   File Preview
                 </div>
 
-                <div className="mt-2 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-xl font-bold text-white">{file.name}</h3>
-                    <p className="mt-1 truncate text-sm text-neutral-400">
-                      {file.summary}
-                    </p>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-lg font-semibold text-white">{file.name}</h3>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <div className="inline-flex rounded-xl border border-white/10 bg-black/30 p-1">
+                  <button
+                    onClick={onClose}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-neutral-400 transition hover:bg-white/[0.08] hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0 flex-1 rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.20em] text-neutral-500">
+                      One-line Summary
+                    </div>
+
+                    <div className="flex items-center gap-2">
+  <span className="text-sm text-neutral-200 truncate">
+    {file.summary}
+  </span>
+</div>
+
+                    <div className="my-2 h-px w-full bg-white/10" />
+                  </div>
+
+                  <div className="flex shrink-0 items-center">
+                    <div className="inline-flex rounded-lg border border-white/10 bg-black/30 p-1">
                       <button
                         onClick={() => setViewMode('summary')}
-                        className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+                        className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition ${
                           viewMode === 'summary'
-                            ? 'bg-white/[0.08] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
+                            ? 'bg-white/[0.08] text-white'
                             : 'text-neutral-400 hover:text-white'
                         }`}
                       >
@@ -565,9 +699,9 @@ const FilePreviewModal = ({ file, viewMode, setViewMode, onClose }) => {
 
                       <button
                         onClick={() => setViewMode('code')}
-                        className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+                        className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition ${
                           viewMode === 'code'
-                            ? 'bg-white/[0.08] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
+                            ? 'bg-white/[0.08] text-white'
                             : 'text-neutral-400 hover:text-white'
                         }`}
                       >
@@ -575,28 +709,23 @@ const FilePreviewModal = ({ file, viewMode, setViewMode, onClose }) => {
                         Code
                       </button>
                     </div>
-
-                    <button
-                      onClick={onClose}
-                      className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08] hover:text-white"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="p-6">
-            <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-neutral-500">
-                  {viewMode === 'summary' ? 'Detailed Summary' : 'Code Preview'}
+          <div className="p-5">
+            <div className="overflow-hidden rounded-2xl border border-white/8 bg-[#0f1117]">
+              <div className="flex items-center justify-between border-b border-white/6 bg-white/[0.02] px-4 py-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-red-400/80" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-yellow-400/80" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
                 </div>
 
-                <div className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[11px] text-neutral-500">
-                  {viewMode === 'summary' ? 'Readable View' : 'Source View'}
+                <div className="text-[11px] uppercase tracking-[0.22em] text-neutral-500">
+                  {viewMode === 'summary' ? 'Summary View' : 'Code View'}
                 </div>
               </div>
 
@@ -607,9 +736,36 @@ const FilePreviewModal = ({ file, viewMode, setViewMode, onClose }) => {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
-                    className="min-h-[420px] whitespace-pre-wrap rounded-xl border border-white/5 bg-black/30 p-5 text-sm leading-7 text-neutral-300"
+                    className="h-[260px] overflow-y-auto px-5 py-4 text-sm leading-7 text-neutral-300"
                   >
-                    {file.summary}
+                    <div className="space-y-4">
+                      <div className="rounded-xl border border-white/6 bg-white/[0.03] p-4">
+                        <div className="mb-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
+                          Overview
+                        </div>
+                        <p>{overview}</p>
+                      </div>
+
+                      <div className="rounded-xl border border-white/6 bg-white/[0.03] p-4">
+                        <div className="mb-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
+                          Responsibilities
+                        </div>
+                        <ul className="list-disc pl-5 space-y-1 text-sm text-neutral-300">
+                          {responsibilities.map((item, index) => (
+                            <li key={`${item}-${index}`}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="rounded-xl border border-white/6 bg-white/[0.03] p-4">
+                        <div className="mb-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
+                          Insights
+                        </div>
+                        <p className="text-sm text-neutral-300">
+                          {insights}
+                        </p>
+                      </div>
+                    </div>
                   </motion.div>
                 ) : (
                   <motion.pre
@@ -617,9 +773,16 @@ const FilePreviewModal = ({ file, viewMode, setViewMode, onClose }) => {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
-                    className="min-h-[420px] overflow-x-auto rounded-xl border border-white/5 bg-black/30 p-5 font-mono text-sm leading-7 text-cyan-200"
+                    className="h-[260px] overflow-auto px-5 py-4 font-mono text-sm leading-7 text-cyan-200"
                   >
-                    <code>{file.code}</code>
+                    <>
+                      <div className="mb-3 flex items-center justify-between text-xs text-neutral-500">
+                        <span>{file.name}</span>
+                        <span>{codeLines} lines</span>
+                      </div>
+
+                      <code>{file.code}</code>
+                    </>
                   </motion.pre>
                 )}
               </AnimatePresence>
@@ -637,13 +800,14 @@ const ResultsStage = () => {
   const [fileViewMode, setFileViewMode] = useState('summary');
 
   const openFileModal = (file) => {
-  setSelectedFile(file);
-  setFileViewMode('summary');
-};
+    setSelectedFile(file);
+    setFileViewMode('summary');
+  };
 
-const closeFileModal = () => {
-  setSelectedFile(null);
-};
+  const closeFileModal = () => {
+    setSelectedFile(null);
+  };
+
   return (
     <motion.section
       initial={{ opacity: 0 }}
@@ -676,15 +840,16 @@ const closeFileModal = () => {
       <GlassCard glow="purple" className="min-h-[560px] p-6">
         <AnimatePresence mode="wait">
           {activeTab === 'directory' && (
-  <motion.div
-    key="directory"
-    initial={{ opacity: 0, y: 14 }}
-    animate={{ opacity: 1, y: 0 }}
-    exit={{ opacity: 0, y: -14 }}
-  >
-    <DirectoryExplorer onFileClick={openFileModal} />
-  </motion.div>
-)}
+            <motion.div
+              key="directory"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -14 }}
+            >
+              <DirectoryExplorer onFileClick={openFileModal} />
+            </motion.div>
+          )}
+
           {activeTab === 'summary' && (
             <motion.div
               key="summary"
@@ -739,7 +904,7 @@ const closeFileModal = () => {
             </motion.div>
           )}
         </AnimatePresence>
-           </GlassCard>
+      </GlassCard>
 
       <FilePreviewModal
         file={selectedFile}
