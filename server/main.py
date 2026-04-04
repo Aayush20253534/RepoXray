@@ -248,6 +248,34 @@ async def get_repo_summary(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading summary data: {str(e)}")
 
+@app.post("/api/change-password")
+async def change_password(
+    request: schemas.ChangePasswordRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Secured endpoint to change the logged-in user's password.
+    """
+    # 1. Verify that the provided old password matches the current one
+    if not auth.verify_password(request.old_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect old password."
+        )
+    
+    # 2. Prevent reusing the same password (optional but recommended)
+    if request.old_password == request.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password cannot be the same as the old password."
+        )
+
+    # 3. Update the password in the database
+    auth.update_user_password(db, current_user, request.new_password)
+    
+    return {"message": "Password changed successfully."}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

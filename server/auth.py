@@ -67,3 +67,12 @@ def authenticate_user(db: Session, identifier: str, password: str):
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
+
+def update_user_password(db: Session, user: User, new_password: str):
+    """
+    Hashes the new password and updates the user record in the database.
+    """
+    user.hashed_password = hash_password(new_password)
+    db.commit()
+    db.refresh(user)
+    return user
