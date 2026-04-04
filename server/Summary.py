@@ -147,6 +147,39 @@ def get_detailed_report(repo_context: dict) -> str:
 
     return "\n\n".join([purpose_result, methodology_result, additional_result])
 
+# --- ADD THIS TO Summary.py ---
+
+def run_summary_generation(repo_id: str, data_dir: str = "./Repo_Codes_data") -> str:
+    """Wrapper to run the summary generation as part of the pipeline."""
+    tree_file_path = os.path.join(data_dir, f"{repo_id}.json")
+    output_path = os.path.join(data_dir, f"{repo_id}_summary.json")
+    
+    if not os.path.exists(tree_file_path):
+        raise FileNotFoundError(f"Tree data missing for summary: {tree_file_path}")
+        
+    # 1. Load the flat dictionary created by PASS 1 (repo_tree.py)
+    with open(tree_file_path, "r", encoding="utf-8") as f:
+        tree_data = json.load(f)
+        
+    # 2. Format the dictionary into a list for the LangChain script
+    file_list = [{"path": filepath, **metadata} for filepath, metadata in tree_data.items()]
+    repo_context = {"files": file_list}
+    
+    # 3. Generate the report
+    print(f"[SUMMARY] Starting architecture summary for {repo_id}...")
+    report_text = get_detailed_report(repo_context)
+    
+    # 4. Save to a JSON file for the FastAPI endpoint
+    summary_data = {
+        "repo_id": repo_id,
+        "summary_report": report_text
+    }
+    
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(summary_data, f, indent=4)
+        
+    print(f"[SUMMARY COMPLETE] Saved summary to {output_path}")
+    return output_path
 
 # --- EXECUTION ---
 

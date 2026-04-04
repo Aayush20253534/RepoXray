@@ -13,6 +13,8 @@ from models import Repository
 # Import the X-ray functions
 from repo_tree import run_repo_xray 
 from dependency_graph import build_dependency_graph  # <-- ADDED NEW PASS 2 FUNCTION
+import concurrent.futures
+from Summary import run_summary_generation  # <-- ADD THIS IMPORT
 
 # Base directory where cloned repos will be stored
 REPOS_BASE_DIR = os.path.join(os.path.dirname(__file__), "cloned_repos")
@@ -108,7 +110,6 @@ def clone_repository(github_url: str, repo_id: str) -> None:
                 update_job_status(repo_id, "error", f"Repository cloned, but .git cleanup failed: {cleanup_error}", clone_path_str)
                 return
 
-            # --- START AI PIPELINE ---
             try:
                 # 2. Run Repo X-Ray (PASS 1: Groq extracts nodes)
                 update_job_status(repo_id, "analyzing_tree", "Clone successful. Extracting files and generating directory tree...", clone_path_str)
@@ -117,19 +118,27 @@ def clone_repository(github_url: str, repo_id: str) -> None:
                 run_repo_xray(repo_id, clone_path_str, output_dir="./Repo_Codes_data")
                 
                 # ---> CRITICAL UPDATE: Signal frontend that the flat Tree is ready! <---
-                update_job_status(repo_id, "tree_ready", "Directory tree complete! Mapping complex dependencies...", clone_path_str)
+                update_job_status(repo_id, "tree_ready", "Directory tree complete! Generating dependencies and summary...", clone_path_str)
                 
-                # 3. Map Dependencies (PASS 2: Gemini connects the edges)
-                print(f"[X-RAY] Starting Pass 2 for {repo_id}")
-                build_dependency_graph(repo_id, data_dir="./Repo_Codes_data")
+                # 3. Map Dependencies & Generate Summary SIMULTANEOUSLY
+                print(f"[PIPELINE] Starting Pass 2 and Summary generation concurrently for {repo_id}...")
+                
+                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                    # Submit both jobs to the thread pool
+                    future_graph = executor.submit(build_dependency_graph, repo_id, data_dir="./Repo_Codes_data")
+                    future_summary = executor.submit(run_summary_generation, repo_id, data_dir="./Repo_Codes_data")
+                    
+                    # Wait for both to complete. If either raises an exception, it will be caught here.
+                    future_graph.result()
+                    future_summary.result()
                 
                 # 4. Mark as completely successful
-                update_job_status(repo_id, "success", "Repository completely analyzed and mapped.", clone_path_str)
+                update_job_status(repo_id, "success", "Repository completely analyzed, mapped, and summarized.", clone_path_str)
                 print(f"[SUCCESS] Pipeline complete for {repo_id}")
                 
-            except Exception as xray_error:
-                print(f"[X-RAY ERROR] Analysis failed for {repo_id}: {xray_error}")
-                update_job_status(repo_id, "error", f"Clone succeeded, but AI analysis failed: {xray_error}", clone_path_str)
+            except Exception as pipeline_error:
+                print(f"[PIPELINE ERROR] Analysis failed for {repo_id}: {pipeline_error}")
+                update_job_status(repo_id, "error", f"Clone succeeded, but AI analysis failed: {pipeline_error}", clone_path_str)
 
         else:
             print(f"[CLONE] Error cloning {github_url}: {result.stderr}")

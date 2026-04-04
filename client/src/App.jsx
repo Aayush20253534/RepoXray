@@ -8,35 +8,29 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
+      {!isAuthenticated ? (
+        <Routes>
+          <Route path="*" element={<LoginPage />} />
+        </Routes>
+      ) : (
+        <div className="flex min-h-screen bg-[#030306] text-white">
 
-        {/* 🔐 Default → Login */}
-        <Route path="/" element={<LoginPage />} />
+          {/* Sidebar */}
+          <Sidebar />
 
-        {/* 🔐 Login */}
-        <Route path="/login" element={<LoginPage />} />
+          {/* Main */}
+          <div className="flex-1">
+            <Routes>
+              <Route path="/" element={<Navigate to="/Repositry_Upload" />} />
+              <Route
+  path="/Repositry_Upload"
+  element={<RepositoryUploadPage key={window.location.pathname + Date.now()} />}
+/>
+            </Routes>
+          </div>
 
-        {/* 🔐 Protected App */}
-        <Route
-          path="/Repositry_Upload"
-          element={
-            isAuthenticated ? (
-              <>
-                <Sidebar />
-                <div style={{ marginLeft: "var(--sidebar-width, 220px)" }}>
-                  <RepositoryUploadPage />
-                </div>
-              </>
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-
-        {/* 🔁 Catch all */}
-        <Route path="*" element={<Navigate to="/login" />} />
-
-      </Routes>
+        </div>
+      )}
     </BrowserRouter>
   );
 }

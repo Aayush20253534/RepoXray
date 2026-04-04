@@ -98,7 +98,9 @@ const Sidebar = () => {
             return (
               <button
                 key={item.name}
-                onClick={() => navigate(item.path)}
+   onClick={() => {
+  window.location.href = item.path;
+}}
                 className={`flex h-12 w-full items-center rounded-lg transition ${
                   isActive
                     ? "bg-purple-500/10 text-cyan-400"
