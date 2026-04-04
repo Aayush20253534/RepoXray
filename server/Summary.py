@@ -1,21 +1,14 @@
 import json
 import os
+import re
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.messages import SystemMessage, HumanMessage
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 # --- CONFIGURATION & PROMPTS ---
-
-INDEXER_INSTRUCTION = """
-You are a Technical Structural Analyst. 
-For each file provided in the JSON chunk, output a DENSE technical profile:
-- Path: [Full File Path]
-- Role: (e.g., Entry Point, Utility, Model, Controller, Middleware)
-- Key Logic: 1-2 sentences on the unique implementation logic.
-- Interaction: List which other local folders or modules this file interacts with.
-- Pattern: Note if it uses specific patterns (e.g., Singleton, Decorators, Dependency Injection).
-"""
 
 PURPOSE_SYSTEM_PROMPT = """
 You are an expert software architect analyzing a codebase.
@@ -90,113 +83,104 @@ IMPORTANT RULES:
 
 def build_chain(system_prompt: str, llm: ChatGoogleGenerativeAI):
     """Build a simple LangChain chain: prompt → LLM → string output."""
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", "{input}"),
-    ])
+    prompt = ChatPromptTemplate.from_messages([("system", system_prompt), ("human", "{input}")])
     return prompt | llm | StrOutputParser()
 
+def _extract_summary_sections(report_text: str) -> dict:
+    """Extract expected sections from report text using robust heading matching."""
+    patterns = {
+        "project_purpose": r"1\.\s*Project Purpose\s*(.*?)(?=\n\s*2\.\s*Coding Methodology|\Z)",
+        "coding_methodology": r"2\.\s*Coding Methodology\s*(.*?)(?=\n\s*3a\.\s*Tech Stack\s*&\s*Technologies|\Z)",
+        "tech_stack_and_insight": r"3a\.\s*Tech Stack\s*&\s*Technologies\s*(.*)",
+    }
+    
+    return {
+        key: (match.group(1).strip() if (match := re.search(pat, report_text, flags=re.IGNORECASE | re.DOTALL)) else "")
+        for key, pat in patterns.items()
+    }
 
-def get_detailed_report(repo_context: dict) -> str:
-    # Shared LLM instance with retry logic handled by LangChain internals
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-3-flash-preview",   # swap for your target model
-        temperature=0,
-        max_retries=5,
-    )
-
-    file_list = repo_context.get("files", [])
-    technical_index = []
-
-    # --- INDEXING PASS ---
-    indexer_chain = build_chain(INDEXER_INSTRUCTION, llm)
-
-    print(f"Starting Indexing Pass for {len(file_list)} files...")
-    for i in range(0, len(file_list), 10):
-        chunk = file_list[i : i + 10]
-        print(f" -> Indexing metadata for files {i} to {i + len(chunk)}...")
-        result = indexer_chain.invoke({"input": f"Analyze these files: {json.dumps(chunk)}"})
-        technical_index.append(result)
-
-    # Shared structural context for all three architect calls
+def get_detailed_report(repo_context: dict) -> dict:
+    llm = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0, max_retries=5)
+    
     structural_profiles = (
-        "Below are the structural technical profiles of the entire codebase.\n\n"
-        "STRUCTURAL PROFILES:\n" + "\n".join(technical_index)
+        "Below is the complete JSON metadata for the entire codebase.\n\nREPOSITORY DATA:\n" 
+        + json.dumps(repo_context.get("files", []), indent=2)
     )
 
-    # --- CALL 1: Project Purpose ---
-    print("\n[Call 1/3] Generating Project Purpose...")
-    purpose_chain = build_chain(PURPOSE_SYSTEM_PROMPT, llm)
-    purpose_result = purpose_chain.invoke({
-        "input": structural_profiles + "\n\nNow provide the Project Purpose section only."
-    })
+    # Consolidated execution of LangChain chains
+    chains = {
+        "Project Purpose": PURPOSE_SYSTEM_PROMPT,
+        "Coding Methodology": METHODOLOGY_SYSTEM_PROMPT,
+        "Additional Insight": ADDITIONAL_SYSTEM_PROMPT
+    }
+    
+    results = []
+    for step, (name, prompt) in enumerate(chains.items(), 1):
+        print(f"[Call {step}/3] Generating {name}...")
+        results.append(build_chain(prompt, llm).invoke({
+            "input": f"{structural_profiles}\n\nNow provide the {name} section only."
+        }))
 
-    # --- CALL 2: Coding Methodology ---
-    print("[Call 2/3] Generating Coding Methodology...")
-    methodology_chain = build_chain(METHODOLOGY_SYSTEM_PROMPT, llm)
-    methodology_result = methodology_chain.invoke({
-        "input": structural_profiles + "\n\nNow provide the Coding Methodology section only."
-    })
+    report_text = "\n\n".join(results)
+    sections = _extract_summary_sections(report_text)
 
-    # --- CALL 3: Additional Insight ---
-    print("[Call 3/3] Generating Additional Insight...")
-    additional_chain = build_chain(ADDITIONAL_SYSTEM_PROMPT, llm)
-    additional_result = additional_chain.invoke({
-        "input": structural_profiles + "\n\nNow provide the Additional Insight section only."
-    })
+    return {
+        "raw": {"summary_report": report_text},
+        "structured": {**sections, "summary_report": report_text},
+        "sections": {"sections": [
+            {"id": "1", "title": "Project Purpose", "content": sections["project_purpose"]},
+            {"id": "2", "title": "Coding Methodology", "content": sections["coding_methodology"]},
+            {"id": "3", "title": "Tech Stack & Additional Insight", "content": sections["tech_stack_and_insight"]},
+        ]}
+    }
 
-    return "\n\n".join([purpose_result, methodology_result, additional_result])
-
-# --- ADD THIS TO Summary.py ---
+# --- SUMMARY PIPELINE ---
 
 def run_summary_generation(repo_id: str, data_dir: str = "./Repo_Codes_data") -> str:
     """Wrapper to run the summary generation as part of the pipeline."""
     tree_file_path = os.path.join(data_dir, f"{repo_id}.json")
-    output_path = os.path.join(data_dir, f"{repo_id}_summary.json")
     
     if not os.path.exists(tree_file_path):
         raise FileNotFoundError(f"Tree data missing for summary: {tree_file_path}")
         
-    # 1. Load the flat dictionary created by PASS 1 (repo_tree.py)
     with open(tree_file_path, "r", encoding="utf-8") as f:
-        tree_data = json.load(f)
-        
-    # 2. Format the dictionary into a list for the LangChain script
-    file_list = [{"path": filepath, **metadata} for filepath, metadata in tree_data.items()]
-    repo_context = {"files": file_list}
+        file_list = [{"path": path, **meta} for path, meta in json.load(f).items()]
     
-    # 3. Generate the report
     print(f"[SUMMARY] Starting architecture summary for {repo_id}...")
-    report_text = get_detailed_report(repo_context)
+    report = get_detailed_report({"files": file_list})
     
-    # 4. Save to a JSON file for the FastAPI endpoint
-    summary_data = {
+    # Consolidate all information into a single structured format
+    analysis_data = {
         "repo_id": repo_id,
-        "summary_report": report_text
+        "analysis": report
     }
-    
+
+    # Write single JSON file
+    output_path = os.path.join(data_dir, f"{repo_id}_analysis.json")
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(summary_data, f, indent=4)
-        
-    print(f"[SUMMARY COMPLETE] Saved summary to {output_path}")
+        json.dump(analysis_data, f, indent=4)
+
+    print(f"[SUMMARY COMPLETE] Saved summary file for {repo_id} at {output_path}")
     return output_path
 
 # --- EXECUTION ---
 
 if __name__ == "__main__":
+    # Removed the hardcoded 'D:\...' paths for a cleaner, universal test block
+    import sys
+    test_id = sys.argv[1] if len(sys.argv) > 1 else "TEST_UUID_HERE"
+    test_path = os.path.join(".", "Repo_Codes_data", f"{test_id}.json")
+    
     try:
-        if not os.path.exists("repo_data.json"):
-            print("Error: repo_data.json not found.")
+        if not os.path.exists(test_path):
+            print(f"Test skipped: Place a valid '{test_id}.json' inside './Repo_Codes_data' to run standalone.")
         else:
-            with open("repo_data.json", "r") as f:
+            with open(test_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
-            report = get_detailed_report(data)
-
-            print("\n" + "=" * 30)
-            print("--- REPO ANALYSIS REPORT ---")
-            print("=" * 30 + "\n")
-            print(report)
+            test_report = get_detailed_report(data)
+            print("\n" + "=" * 30 + "\n--- REPO ANALYSIS REPORT ---\n" + "=" * 30 + "\n")
+            print(test_report["raw"]["summary_report"])
 
     except Exception as final_error:
         print(f"\n[CRITICAL ERROR]: {final_error}")
