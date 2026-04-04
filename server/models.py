@@ -9,6 +9,7 @@ class User(Base):
     user_id = Column(String, unique=True, index=True)
     name = Column(String)
     username = Column(String, unique=True, index=True)
+    email = Column(String, unique=True)
     hashed_password = Column(String)
     
     # Establishes a 1-to-Many relationship: One user can have many repositories

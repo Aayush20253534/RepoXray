@@ -1,10 +1,17 @@
 import os
 import json
 import uuid
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
+from sqlalchemy.orm import Session
+import auth
+from database import SessionLocal
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from Repo_clone import get_repo_status, start_clone_job
+import schemas
+from schemas import UserCreate, IngestRequest
+
 
 app = FastAPI(
     title="Explain My Codebase API",
@@ -19,8 +26,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class IngestRequest(BaseModel):
-    github_url: str 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@app.post("/signup", status_code=status.HTTP_201_CREATED)
+def signup(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
+    user = auth.register_user(db, user_in)
+    return {"message": "User created successfully", "user_id": user.id}
+
+@app.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = auth.authenticate_user(db, form_data.username, form_data.password)
+    
+    access_token = auth.create_access_token(
+        data={"sub": user.email, "user_id": user.id}
+    )
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 @app.get("/health")
 async def health_check():
@@ -90,3 +121,4 @@ async def get_repo_tree(repo_id: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
