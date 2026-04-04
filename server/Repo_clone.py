@@ -1,4 +1,6 @@
 import os
+import stat
+import time
 import subprocess
 import threading
 import shutil
@@ -19,13 +21,35 @@ def ensure_base_directory():
 def get_repo_clone_path(repo_id: str) -> Path:
     return Path(REPOS_BASE_DIR) / repo_id
 
+
+def _handle_remove_readonly(func, path, exc_info):
+    """shutil.rmtree callback to handle read-only files on Windows."""
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        raise exc_info[1]
+
 def remove_git_metadata(clone_path: Path) -> None:
     """Remove .git metadata from a cloned repository for safety."""
     git_path = clone_path / ".git"
 
     if git_path.is_dir():
-        shutil.rmtree(git_path)
+        # Retry a few times because antivirus/indexers can briefly lock files on Windows.
+        last_error = None
+        for _ in range(3):
+            try:
+                shutil.rmtree(git_path, onerror=_handle_remove_readonly)
+                last_error = None
+                break
+            except PermissionError as err:
+                last_error = err
+                time.sleep(0.25)
+
+        if last_error is not None and git_path.exists():
+            raise last_error
     elif git_path.exists() or git_path.is_symlink():
+        os.chmod(git_path, stat.S_IWRITE)
         git_path.unlink()
 
 def update_job_status(repo_id: str, status: str, message: str, clone_path: str = "") -> None:
@@ -109,18 +133,17 @@ def clone_repository(github_url: str, repo_id: str) -> None:
         print(f"[CLONE] Exception while cloning {github_url}: {str(e)}")
         update_job_status(repo_id, "error", f"Exception occurred: {str(e)}", clone_path_str)
 
-def start_clone_job(github_url: str, repo_id: str) -> Dict[str, str]:
+def start_clone_job(github_url: str, repo_id: str, owner_id: int) -> Dict[str, str]:
     """Creates the Repository record and spawns the background worker."""
     clone_path = str(get_repo_clone_path(repo_id))
     
-    # 1. Create the unified Repository record
     db = SessionLocal()
     try:
-        # We can extract a rough repo_name from the URL
         repo_name = github_url.rstrip('/').split('/')[-1].replace('.git', '')
         
         new_repo = Repository(
             id=repo_id,
+            owner_id=owner_id, # <--- Link to the user who requested it
             github_url=github_url,
             repo_name=repo_name,
             status="queued",
@@ -135,7 +158,7 @@ def start_clone_job(github_url: str, repo_id: str) -> Dict[str, str]:
     finally:
         db.close()
 
-    # 2. Start the background thread
+    # The rest of this function remains exactly the same
     worker = threading.Thread(
         target=clone_repository,
         args=(github_url, repo_id),
@@ -150,11 +173,16 @@ def start_clone_job(github_url: str, repo_id: str) -> Dict[str, str]:
         "message": "Clone job started",
     }
 
-def get_repo_status(repo_id: str) -> Dict[str, str]:
-    """Queries the Repository table for the current status."""
+def get_repo_status(repo_id: str, owner_id: int) -> Dict[str, str]:
+    """Queries the Repository table for the current status, verifying ownership."""
     db = SessionLocal()
     try:
-        repo = db.query(Repository).filter(Repository.id == repo_id).first()
+        # Check BOTH the repo_id and the owner_id so users can't snoop on other users' repos
+        repo = db.query(Repository).filter(
+            Repository.id == repo_id, 
+            Repository.owner_id == owner_id
+        ).first()
+        
         if repo:
             return {
                 "repo_id": repo.id,
@@ -166,7 +194,7 @@ def get_repo_status(repo_id: str) -> Dict[str, str]:
         return {
             "repo_id": repo_id,
             "status": "not_found",
-            "message": "Repository not found in database",
+            "message": "Repository not found or unauthorized",
             "clone_path": ""
         }
     finally:
