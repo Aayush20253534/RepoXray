@@ -36,6 +36,7 @@ import {
   useEdgesState,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+const API_BASE_URL = "http://localhost:8000";
 
 // ==========================
 // Shared UI
@@ -325,7 +326,7 @@ const DirectoryExplorer = ({ onFileClick }) => {
 // Stage 1: Upload Page
 // ==========================
 
-const UploadStage = ({ repoUrl, setRepoUrl, onAnalyze }) => {
+const UploadStage = ({ repoUrl, setRepoUrl, onAnalyze, apiError, isSubmitting }) => {
   const isValidRepo = repoUrl.trim().includes('github.com/');
 
   const pasteDemo = () => {
@@ -374,7 +375,7 @@ const UploadStage = ({ repoUrl, setRepoUrl, onAnalyze }) => {
               </div>
 
               <div className="relative">
-                <Icons.GitBranch  className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-500" />
+                <Icons.GitBranch className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-500" />
                 <input
                   value={repoUrl}
                   onChange={(e) => setRepoUrl(e.target.value)}
@@ -382,6 +383,12 @@ const UploadStage = ({ repoUrl, setRepoUrl, onAnalyze }) => {
                   className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/70 py-4 pl-12 pr-4 text-white outline-none transition-all placeholder:text-neutral-600 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/30"
                 />
               </div>
+
+              {apiError && (
+                <div className="mt-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                  {apiError}
+                </div>
+              )}
             </div>
 
             <div className="mb-8 rounded-2xl border border-white/8 bg-white/[0.03] p-4">
@@ -399,7 +406,7 @@ const UploadStage = ({ repoUrl, setRepoUrl, onAnalyze }) => {
                   <ChevronRight className="h-4 w-4 text-neutral-500" />
                 </div>
                 <div className="flex items-center justify-between rounded-xl border border-white/5 bg-black/25 px-4 py-3">
-                  <span>3. Produce semantic code summary </span>
+                  <span>3. Produce semantic code summary</span>
                   <ChevronRight className="h-4 w-4 text-neutral-500" />
                 </div>
                 <div className="flex items-center justify-between rounded-xl border border-white/5 bg-black/25 px-4 py-3">
@@ -412,7 +419,8 @@ const UploadStage = ({ repoUrl, setRepoUrl, onAnalyze }) => {
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
                 onClick={pasteDemo}
-                className="flex items-center justify-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900 px-5 py-3 text-neutral-300 transition-all hover:bg-neutral-800"
+                disabled={isSubmitting}
+                className="flex items-center justify-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900 px-5 py-3 text-neutral-300 transition-all hover:bg-neutral-800 disabled:opacity-50"
               >
                 <ClipboardPaste className="h-4 w-4" />
                 Paste Demo
@@ -420,11 +428,11 @@ const UploadStage = ({ repoUrl, setRepoUrl, onAnalyze }) => {
 
               <button
                 onClick={() => onAnalyze(repoUrl)}
-                disabled={!isValidRepo}
+                disabled={!isValidRepo || isSubmitting}
                 className="flex-1 rounded-xl bg-gradient-to-r from-purple-600 via-violet-600 to-blue-600 px-6 py-3 font-semibold text-white shadow-[0_0_35px_rgba(168,85,247,0.35)] transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <span className="flex items-center justify-center gap-2">
-                  Analyze Repository
+                  {isSubmitting ? "Sending to Backend..." : "Analyze Repository"}
                   <ArrowRight className="h-4 w-4" />
                 </span>
               </button>
@@ -435,36 +443,33 @@ const UploadStage = ({ repoUrl, setRepoUrl, onAnalyze }) => {
     </motion.section>
   );
 };
-
 // ==========================
 // Stage 2A: Circular Buffer
 // ==========================
 
-const LoadingBuffer = ({ onComplete }) => {
+const LoadingBuffer = ({ statusText = "Processing repository..." }) => {
   const [progress, setProgress] = useState(0);
   const [statusIndex, setStatusIndex] = useState(0);
 
   const statuses = [
-    'Cloning repository core...',
-    'Reading project skeleton...',
-    'Indexing source files...',
-    'Tracing dependency signatures...',
-    'Composing code summary...',
-    'Opening minimal result view...',
+    "Cloning repository core...",
+    "Reading project skeleton...",
+    "Indexing source files...",
+    "Tracing dependency signatures...",
+    "Composing code summary...",
+    statusText,
   ];
 
   useEffect(() => {
     const progressTimer = setInterval(() => {
       setProgress((prev) => {
-        const next = prev + 1;
+        const next = prev + 2;
         if (next >= 100) {
-          clearInterval(progressTimer);
-          setTimeout(onComplete, 700);
-          return 100;
+          return 0; // loop forever
         }
         return next;
       });
-    }, 70);
+    }, 90);
 
     const statusTimer = setInterval(() => {
       setStatusIndex((prev) => (prev + 1) % statuses.length);
@@ -474,7 +479,7 @@ const LoadingBuffer = ({ onComplete }) => {
       clearInterval(progressTimer);
       clearInterval(statusTimer);
     };
-  }, [onComplete]);
+  }, [statusText, statuses.length]);
 
   const orbitDots = Array.from({ length: 10 });
 
@@ -494,58 +499,52 @@ const LoadingBuffer = ({ onComplete }) => {
 
         <div className="relative z-10 flex flex-col items-center">
           <div className="relative flex h-[360px] w-[360px] items-center justify-center">
-            {/* outer soft pulse */}
             <motion.div
               animate={{ scale: [1, 1.06, 1], opacity: [0.2, 0.35, 0.2] }}
-              transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+              transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
               className="absolute inset-0 rounded-full border border-purple-500/10 bg-purple-500/5 blur-[2px]"
             />
 
-            {/* orbit ring 1 */}
             <motion.div
               animate={{ rotate: 360 }}
-              transition={{ duration: 16, repeat: Infinity, ease: 'linear' }}
+              transition={{ duration: 16, repeat: Infinity, ease: "linear" }}
               className="absolute inset-0 rounded-full border border-dashed border-purple-500/30"
             >
               <div className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full bg-purple-400 shadow-[0_0_22px_rgba(168,85,247,0.95)]" />
               <div className="absolute left-8 top-[22%] h-2.5 w-2.5 rounded-full bg-fuchsia-300 shadow-[0_0_16px_rgba(217,70,239,0.8)]" />
             </motion.div>
 
-            {/* orbit ring 2 */}
             <motion.div
               animate={{ rotate: -360 }}
-              transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+              transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
               className="absolute inset-[24px] rounded-full border border-cyan-500/25"
             >
               <div className="absolute right-10 top-[12%] h-3.5 w-3.5 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(34,211,238,0.95)]" />
               <div className="absolute bottom-8 left-[18%] h-2 w-2 rounded-full bg-sky-300 shadow-[0_0_14px_rgba(56,189,248,0.8)]" />
             </motion.div>
 
-            {/* orbit ring 3 */}
             <motion.div
               animate={{ rotate: 360 }}
-              transition={{ duration: 22, repeat: Infinity, ease: 'linear' }}
+              transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
               className="absolute inset-[50px] rounded-full border border-blue-500/20 border-dashed"
             >
               <div className="absolute left-1/2 top-0 h-3 w-3 -translate-x-1/2 rounded-full bg-blue-300 shadow-[0_0_16px_rgba(96,165,250,0.9)]" />
             </motion.div>
 
-            {/* segmented arc ring */}
             <motion.div
               animate={{ rotate: -360 }}
-              transition={{ duration: 7, repeat: Infinity, ease: 'linear' }}
+              transition={{ duration: 7, repeat: Infinity, ease: "linear" }}
               className="absolute inset-[78px] rounded-full"
               style={{
                 background:
-                  'conic-gradient(from 0deg, rgba(168,85,247,0.95) 0deg, rgba(34,211,238,0.85) 90deg, transparent 120deg, transparent 220deg, rgba(59,130,246,0.85) 270deg, rgba(168,85,247,0.95) 320deg, transparent 360deg)',
+                  "conic-gradient(from 0deg, rgba(168,85,247,0.95) 0deg, rgba(34,211,238,0.85) 90deg, transparent 120deg, transparent 220deg, rgba(59,130,246,0.85) 270deg, rgba(168,85,247,0.95) 320deg, transparent 360deg)",
                 WebkitMask:
-                  'radial-gradient(farthest-side, transparent calc(100% - 8px), white calc(100% - 7px))',
+                  "radial-gradient(farthest-side, transparent calc(100% - 8px), white calc(100% - 7px))",
                 mask:
-                  'radial-gradient(farthest-side, transparent calc(100% - 8px), white calc(100% - 7px))',
+                  "radial-gradient(farthest-side, transparent calc(100% - 8px), white calc(100% - 7px))",
               }}
             />
 
-            {/* floating tiny particles */}
             {orbitDots.map((_, i) => (
               <motion.div
                 key={i}
@@ -556,7 +555,7 @@ const LoadingBuffer = ({ onComplete }) => {
                 transition={{
                   duration: 2 + i * 0.18,
                   repeat: Infinity,
-                  ease: 'easeInOut',
+                  ease: "easeInOut",
                   delay: i * 0.12,
                 }}
                 className="absolute rounded-full bg-white"
@@ -565,49 +564,44 @@ const LoadingBuffer = ({ onComplete }) => {
                   height: `${2 + (i % 3)}px`,
                   top: `${18 + ((i * 7) % 64)}%`,
                   left: `${14 + ((i * 9) % 70)}%`,
-                  boxShadow: '0 0 12px rgba(255,255,255,0.45)',
+                  boxShadow: "0 0 12px rgba(255,255,255,0.45)",
                 }}
               />
             ))}
 
-            {/* core glow */}
             <motion.div
               animate={{ scale: [1, 1.12, 1], opacity: [0.55, 0.8, 0.55] }}
-              transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
               className="absolute h-32 w-32 rounded-full bg-purple-500/20 blur-3xl"
             />
+
             <motion.div
               animate={{ scale: [1, 1.16, 1], opacity: [0.35, 0.55, 0.35] }}
-              transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
+              transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut" }}
               className="absolute h-44 w-44 rounded-full bg-cyan-500/12 blur-3xl"
             />
 
-            {/* central orb */}
             <motion.div
               animate={{ scale: [1, 1.03, 1] }}
-              transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
               className="relative z-10 flex h-[120px] w-[120px] flex-col items-center justify-center rounded-full border border-white/10 bg-white/[0.05] shadow-[0_0_60px_rgba(168,85,247,0.15)] backdrop-blur-xl"
             >
               <motion.div
                 animate={{ scale: [1, 1.08, 1] }}
-                transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+                transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
                 className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-purple-500/20 via-cyan-500/10 to-blue-500/20"
               >
                 <Orbit className="h-8 w-8 text-white" />
               </motion.div>
-{/* 
-              <div className="text-xl font-semibold tracking-tight text-white leading-none">
-                {progress}%
-              </div> */}
             </motion.div>
           </div>
 
           <AnimatePresence mode="wait">
             <motion.p
               key={statusIndex}
-              initial={{ opacity: 0, y: 8, filter: 'blur(6px)' }}
-              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, y: -8, filter: 'blur(6px)' }}
+              initial={{ opacity: 0, y: 8, filter: "blur(6px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -8, filter: "blur(6px)" }}
               transition={{ duration: 0.35 }}
               className="mt-5 text-center text-sm font-medium text-purple-300 md:text-base"
             >
@@ -618,8 +612,8 @@ const LoadingBuffer = ({ onComplete }) => {
           <div className="mt-8 w-full max-w-xl">
             <div className="h-2.5 overflow-hidden rounded-full border border-white/5 bg-neutral-900">
               <motion.div
-                initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
+                transition={{ ease: "linear", duration: 0.08 }}
                 className="relative h-full bg-gradient-to-r from-purple-500 via-cyan-500 to-blue-500"
               >
                 <div className="absolute inset-y-0 right-0 w-16 bg-white/20 blur-md" />
@@ -1493,13 +1487,109 @@ export default function RepositoryIntelligencePage() {
   const [stage, setStage] = useState('upload');
   const [repoUrl, setRepoUrl] = useState('');
   const [showLoadingInsideResults, setShowLoadingInsideResults] = useState(true);
+  const [repoId, setRepoId] = useState(null);
+  const [repoStatus, setRepoStatus] = useState(null);
+  const [apiError, setApiError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleAnalyze = (url) => {
-    setRepoUrl(url);
-    setStage('results');
-    setShowLoadingInsideResults(true);
+  useEffect(() => {
+    if (!repoId) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const ws = new WebSocket(
+      `${API_BASE_URL.replace("http", "ws")}/api/ws/status/${repoId}?token=${token}`
+    );
+
+    ws.onmessage = async (event) => {
+      try {
+        const statusInfo = JSON.parse(event.data);
+        const currentStatus = statusInfo.status;
+
+        setRepoStatus(currentStatus || "processing");
+
+        if (currentStatus === "tree_ready" || currentStatus === "success") {
+          setShowLoadingInsideResults(false);
+        }
+
+        if (currentStatus === "error" || currentStatus === "not_found") {
+          setApiError(statusInfo.detail || "Repository processing failed.");
+          setShowLoadingInsideResults(false);
+          setStage("upload");
+        }
+      } catch (err) {
+        console.error("WebSocket parse error:", err);
+      }
+    };
+
+    ws.onerror = () => {
+      console.error("WebSocket connection failed.");
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [repoId]);
+
+  const handleAnalyze = async (incomingRepoUrl) => {
+    const cleanUrl = incomingRepoUrl.trim();
+    const token = localStorage.getItem("token");
+
+    if (!cleanUrl) {
+      setApiError("Please enter a GitHub repository URL.");
+      return;
+    }
+
+    if (!cleanUrl.includes("github.com/")) {
+      setApiError("Please enter a valid GitHub repository URL.");
+      return;
+    }
+
+    if (!token) {
+      setApiError("You are not logged in. Please login again.");
+      window.location.href = "/";
+      return;
+    }
+
+    try {
+      setApiError("");
+      setIsSubmitting(true);
+      setRepoStatus("Submitting repository...");
+      setStage("results");
+      setShowLoadingInsideResults(true);
+      setRepoId(null);
+
+      const response = await fetch(`${API_BASE_URL}/api/ingest`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          github_url: cleanUrl,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Failed to send repository to backend");
+      }
+
+      setRepoId(data.repo_id);
+      setRepoStatus(data.status || "queued");
+
+      console.log("Ingest response:", data);
+    } catch (error) {
+      console.error("Analyze error:", error);
+      setApiError(error.message || "Something went wrong while analyzing repository.");
+      setShowLoadingInsideResults(false);
+      setStage("upload");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
-
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#030306] text-white selection:bg-purple-500/30">
       <Sidebar />
@@ -1548,11 +1638,13 @@ export default function RepositoryIntelligencePage() {
                   </div>
                 </div>
 
-                <UploadStage
-                  repoUrl={repoUrl}
-                  setRepoUrl={setRepoUrl}
-                  onAnalyze={handleAnalyze}
-                />
+               <UploadStage
+  repoUrl={repoUrl}
+  setRepoUrl={setRepoUrl}
+  onAnalyze={handleAnalyze}
+  apiError={apiError}
+  isSubmitting={isSubmitting}
+/>
               </motion.div>
             )}
 
@@ -1564,10 +1656,10 @@ export default function RepositoryIntelligencePage() {
                 exit={{ opacity: 0 }}
               >
                 {showLoadingInsideResults ? (
-                  <LoadingBuffer onComplete={() => setShowLoadingInsideResults(false)} />
-                ) : (
-                  <ResultsStage />
-                )}
+  <LoadingBuffer statusText={repoStatus || "Backend processing in progress..."} />
+) : (
+  <ResultsStage />
+)}
               </motion.div>
             )}
           </AnimatePresence>
