@@ -476,6 +476,8 @@ const LoadingBuffer = ({ onComplete }) => {
     };
   }, [onComplete]);
 
+  const orbitDots = Array.from({ length: 10 });
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -485,69 +487,143 @@ const LoadingBuffer = ({ onComplete }) => {
     >
       <div className="relative w-full max-w-5xl overflow-hidden rounded-[36px] border border-white/10 bg-black/30 px-6 py-14 backdrop-blur-2xl md:px-12">
         <div className="absolute inset-0">
-          <div className="absolute left-1/2 top-1/2 h-[480px] w-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple-600/10 blur-[140px]" />
-          <div className="absolute left-1/2 top-1/2 h-[340px] w-[340px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-500/10 blur-[110px]" />
+          <div className="absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple-600/12 blur-[150px]" />
+          <div className="absolute left-1/2 top-1/2 h-[380px] w-[380px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-500/12 blur-[120px]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.05),transparent_58%)]" />
         </div>
 
         <div className="relative z-10 flex flex-col items-center">
-          <div className="relative flex h-[320px] w-[320px] items-center justify-center">
+          <div className="relative flex h-[360px] w-[360px] items-center justify-center">
+            {/* outer soft pulse */}
+            <motion.div
+              animate={{ scale: [1, 1.06, 1], opacity: [0.2, 0.35, 0.2] }}
+              transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute inset-0 rounded-full border border-purple-500/10 bg-purple-500/5 blur-[2px]"
+            />
+
+            {/* orbit ring 1 */}
             <motion.div
               animate={{ rotate: 360 }}
-              transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+              transition={{ duration: 16, repeat: Infinity, ease: 'linear' }}
               className="absolute inset-0 rounded-full border border-dashed border-purple-500/30"
-            />
+            >
+              <div className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full bg-purple-400 shadow-[0_0_22px_rgba(168,85,247,0.95)]" />
+              <div className="absolute left-8 top-[22%] h-2.5 w-2.5 rounded-full bg-fuchsia-300 shadow-[0_0_16px_rgba(217,70,239,0.8)]" />
+            </motion.div>
+
+            {/* orbit ring 2 */}
+            <motion.div
+              animate={{ rotate: -360 }}
+              transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+              className="absolute inset-[24px] rounded-full border border-cyan-500/25"
+            >
+              <div className="absolute right-10 top-[12%] h-3.5 w-3.5 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(34,211,238,0.95)]" />
+              <div className="absolute bottom-8 left-[18%] h-2 w-2 rounded-full bg-sky-300 shadow-[0_0_14px_rgba(56,189,248,0.8)]" />
+            </motion.div>
+
+            {/* orbit ring 3 */}
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 22, repeat: Infinity, ease: 'linear' }}
+              className="absolute inset-[50px] rounded-full border border-blue-500/20 border-dashed"
+            >
+              <div className="absolute left-1/2 top-0 h-3 w-3 -translate-x-1/2 rounded-full bg-blue-300 shadow-[0_0_16px_rgba(96,165,250,0.9)]" />
+            </motion.div>
+
+            {/* segmented arc ring */}
             <motion.div
               animate={{ rotate: -360 }}
               transition={{ duration: 7, repeat: Infinity, ease: 'linear' }}
-              className="absolute inset-6 rounded-full border border-cyan-500/30"
-            />
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 13, repeat: Infinity, ease: 'linear' }}
-              className="absolute inset-12 rounded-full border border-blue-500/20"
-            />
-
-            <motion.div
-              animate={{ scale: [1, 1.1, 1] }}
-              transition={{ duration: 2.4, repeat: Infinity }}
-              className="absolute h-28 w-28 rounded-full bg-purple-500/20 blur-3xl"
-            />
-            <motion.div
-              animate={{ scale: [1, 1.14, 1] }}
-              transition={{ duration: 2.8, repeat: Infinity }}
-              className="absolute h-36 w-36 rounded-full bg-cyan-500/10 blur-3xl"
+              className="absolute inset-[78px] rounded-full"
+              style={{
+                background:
+                  'conic-gradient(from 0deg, rgba(168,85,247,0.95) 0deg, rgba(34,211,238,0.85) 90deg, transparent 120deg, transparent 220deg, rgba(59,130,246,0.85) 270deg, rgba(168,85,247,0.95) 320deg, transparent 360deg)',
+                WebkitMask:
+                  'radial-gradient(farthest-side, transparent calc(100% - 8px), white calc(100% - 7px))',
+                mask:
+                  'radial-gradient(farthest-side, transparent calc(100% - 8px), white calc(100% - 7px))',
+              }}
             />
 
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05]">
+            {/* floating tiny particles */}
+            {orbitDots.map((_, i) => (
+              <motion.div
+                key={i}
+                animate={{
+                  y: [0, -10, 0],
+                  opacity: [0.25, 0.8, 0.25],
+                }}
+                transition={{
+                  duration: 2 + i * 0.18,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                  delay: i * 0.12,
+                }}
+                className="absolute rounded-full bg-white"
+                style={{
+                  width: `${2 + (i % 3)}px`,
+                  height: `${2 + (i % 3)}px`,
+                  top: `${18 + ((i * 7) % 64)}%`,
+                  left: `${14 + ((i * 9) % 70)}%`,
+                  boxShadow: '0 0 12px rgba(255,255,255,0.45)',
+                }}
+              />
+            ))}
+
+            {/* core glow */}
+            <motion.div
+              animate={{ scale: [1, 1.12, 1], opacity: [0.55, 0.8, 0.55] }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute h-32 w-32 rounded-full bg-purple-500/20 blur-3xl"
+            />
+            <motion.div
+              animate={{ scale: [1, 1.16, 1], opacity: [0.35, 0.55, 0.35] }}
+              transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute h-44 w-44 rounded-full bg-cyan-500/12 blur-3xl"
+            />
+
+            {/* central orb */}
+            <motion.div
+              animate={{ scale: [1, 1.03, 1] }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+              className="relative z-10 flex h-[120px] w-[120px] flex-col items-center justify-center rounded-full border border-white/10 bg-white/[0.05] shadow-[0_0_60px_rgba(168,85,247,0.15)] backdrop-blur-xl"
+            >
+              <motion.div
+                animate={{ scale: [1, 1.08, 1] }}
+                transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+                className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-purple-500/20 via-cyan-500/10 to-blue-500/20"
+              >
                 <Orbit className="h-8 w-8 text-white" />
-              </div>
-              <div className="text-5xl font-bold text-white">{progress}%</div>
-              <div className="mt-2 text-[11px] uppercase tracking-[0.35em] text-neutral-500">
-                Processing
-              </div>
-            </div>
+              </motion.div>
+{/* 
+              <div className="text-xl font-semibold tracking-tight text-white leading-none">
+                {progress}%
+              </div> */}
+            </motion.div>
           </div>
 
           <AnimatePresence mode="wait">
             <motion.p
               key={statusIndex}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className="mt-4 text-center text-sm font-medium text-purple-300 md:text-base"
+              initial={{ opacity: 0, y: 8, filter: 'blur(6px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -8, filter: 'blur(6px)' }}
+              transition={{ duration: 0.35 }}
+              className="mt-5 text-center text-sm font-medium text-purple-300 md:text-base"
             >
               {statuses[statusIndex]}
             </motion.p>
           </AnimatePresence>
 
           <div className="mt-8 w-full max-w-xl">
-            <div className="h-2 overflow-hidden rounded-full border border-white/5 bg-neutral-900">
+            <div className="h-2.5 overflow-hidden rounded-full border border-white/5 bg-neutral-900">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
-                className="h-full bg-gradient-to-r from-purple-500 via-cyan-500 to-blue-500"
-              />
+                className="relative h-full bg-gradient-to-r from-purple-500 via-cyan-500 to-blue-500"
+              >
+                <div className="absolute inset-y-0 right-0 w-16 bg-white/20 blur-md" />
+              </motion.div>
             </div>
           </div>
         </div>
@@ -1332,7 +1408,7 @@ export default function RepositoryIntelligencePage() {
                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-blue-500 shadow-[0_0_30px_rgba(168,85,247,0.3)]">
                       <Layers3 className="h-5 w-5 text-white" />
                     </div>
-                    <div className="flex flex-col leading-none">
+                    <div className="flex flex-col leading-tight gap-[8px]">
   <div className="text-lg font-bold text-white">
     RepoXray Intelligence Engine
   </div>
