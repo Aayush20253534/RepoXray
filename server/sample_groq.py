@@ -1,9 +1,12 @@
-from api_groq import client
-import json, uuid, os
+import os
+import json
 from pathlib import Path
+from langchain_core.prompts import PromptTemplate
+from api_groq import llm
 
-
-SUMMARY_FILE = "uuid_summary.json"
+# Define where your repositories are cloned on the server.
+# Change this to match the destination folder used in your Repo_clone.py script!
+REPOS_BASE_DIR = Path("./cloned_repos") 
 
 PROMPT_TEMPLATE = """You are a senior software engineer performing deep code analysis.
 You are given the contents of a single file from a GitHub repository.
@@ -56,50 +59,52 @@ Now analyze the following file:
 {code_here}
 """
 
+# Create the LangChain Prompt and Chain
+prompt = PromptTemplate(
+    input_variables=["code_here"],
+    template=PROMPT_TEMPLATE
+)
+chain = prompt | llm
 
-def load_summaries() -> dict:
-    if os.path.exists(SUMMARY_FILE):
-        with open(SUMMARY_FILE, "r") as f:
+def get_cache_path(repo_id: str) -> str:
+    """Returns the dedicated cache file path for a specific repository."""
+    return f"Repo_Codes_data/{repo_id}_file_summaries.json"
+
+def load_summaries(repo_id: str) -> dict:
+    cache_path = get_cache_path(repo_id)
+    if os.path.exists(cache_path):
+        with open(cache_path, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
-
-def save_summaries(data: dict):
-    with open(SUMMARY_FILE, "w") as f:
+def save_summaries(repo_id: str, data: dict):
+    cache_path = get_cache_path(repo_id)
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    with open(cache_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
+# Removed repo_clone from arguments
+def summarize_file(repo_id: str, file_path: str) -> dict:
+    summaries = load_summaries(repo_id)
 
-def summarize_file(user_id: str, repo_clone: str, file_path: str) -> dict:
-    summaries = load_summaries()
-    file_name = Path(file_path).name
+    # 1. Check if the summary is already cached for this specific file path
+    if file_path in summaries:
+        return {"summary": summaries[file_path], "cached": True}
 
-    # Return cached summary if exists
-    if file_name in summaries:
-        return {"summary": summaries[file_name], "cached": True}
-
-    # Read the actual file
-    full_path = Path(repo_clone) / file_path
+    # 2. Construct the full path using the base directory, repo_id, and file_path
+    full_path = REPOS_BASE_DIR / repo_id / file_path
+    
     if not full_path.exists():
-        raise FileNotFoundError(f"File not found: {full_path}")
+        raise FileNotFoundError(f"File not found on server: {full_path}")
 
     code_content = full_path.read_text(encoding="utf-8", errors="ignore")
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {
-                "role": "user",
-                "content": PROMPT_TEMPLATE.format(code_here=code_content)
-            }
-        ],
-        temperature=0.3,
-    )
+    # 3. Run the LangChain API call
+    response = chain.invoke({"code_here": code_content})
+    summary_text = response.content.strip()
 
-    summary_text = response.choices[0].message.content.strip()
-
-    # Save as { "main.py": "summary text..." }
-    summaries[file_name] = summary_text
-    save_summaries(summaries)
+    # 4. Save the new summary to the repo's cache
+    summaries[file_path] = summary_text
+    save_summaries(repo_id, summaries)
 
     return {"summary": summary_text, "cached": False}
-

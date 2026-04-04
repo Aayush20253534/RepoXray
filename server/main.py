@@ -9,21 +9,15 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 from dotenv import load_dotenv
-import models
-from database import engine
-from pydantic import BaseModel
-import auth
+
+# Local imports
 import models
 import schemas
-from database import SessionLocal
+import auth
+from database import engine, SessionLocal
 from schemas import UserCreate, IngestRequest
 from Repo_clone import get_repo_status, start_clone_job
-import schemas
-from schemas import UserCreate, IngestRequest
-from jose import JWTError, jwt
 from sample_groq import summarize_file
-import models
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -49,10 +43,9 @@ def get_db():
     finally:
         db.close()
 
-
-class SummaryRequest(BaseModel):
-    user_id: str
-    repo_clone: str   # local path to the cloned repo, e.g. "/tmp/repos/my-repo"
+# Updated Request Model for the single secured endpoint
+class FileSummaryRequest(BaseModel):
+    repo_id: str
     file_path: str
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
@@ -73,31 +66,6 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if user is None:
         raise credentials_exception
     return user
-
-@app.post("/summarize")
-def summarize(request: SummaryRequest):
-    try:
-        result = summarize_file(
-            user_id=request.user_id,
-            repo_clone=request.repo_clone,
-            file_path=request.file_path,
-        )
-        return result
-
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/summaries")
-def get_all_summaries():
-    """Fetch all cached summaries from uuid_summary.json."""
-    if not os.path.exists("uuid_summary.json"):
-        return {"summaries": {}}
-    with open("uuid_summary.json") as f:
-        all_data = json.load(f)
-    return {"summaries": all_data}  # returns { "main.py": "summary...", ... }
 
 @app.post("/signup", status_code=status.HTTP_201_CREATED)
 def signup(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
@@ -135,20 +103,46 @@ async def ingest_repository(
         "websocket_endpoint": f"ws://localhost:8000/api/ws/status/{repo_id}",
         "tree_endpoint": f"/api/tree/{repo_id}",
         "graph_endpoint": f"/api/graph/{repo_id}",
-        "summary_endpoint": f"/api/summary/{repo_id}"  # <-- ADDED
+        "summary_endpoint": f"/api/summary/{repo_id}"
     }
 
+# --- NEW UNIFIED SECURE SUMMARY ENDPOINT ---
+@app.post("/api/file-summary")
+async def get_or_create_file_summary(
+    request: FileSummaryRequest,
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Checks if a file summary is cached in the repo's specific JSON file.
+    If yes, returns it. If not, generates via LangChain API, caches it, and returns.
+    """
+    # Verify the user has access to this repo and it exists
+    status_info = get_repo_status(request.repo_id, current_user.id)
+    if status_info.get("status") == "not_found":
+        raise HTTPException(status_code=404, detail="Repository not found or unauthorized.")
+
+    try:
+        # We no longer pass repo_clone here
+        result = summarize_file(
+            repo_id=request.repo_id,
+            file_path=request.file_path,
+        )
+        return result
+
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 # --- REAL-TIME WEBSOCKET STATUS TRACKER ---
 @app.websocket("/api/ws/status/{repo_id}")
 async def repo_status_ws(
     websocket: WebSocket, 
     repo_id: str, 
-    token: str, # Passed as a query param since browser WebSockets can't send auth headers easily
+    token: str, 
     db: Session = Depends(get_db)
 ):
     await websocket.accept()
     try:
-        # 1. Authenticate the WebSocket connection manually
         payload = jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
         username: str = payload.get("sub")
         user = db.query(models.User).filter(models.User.username == username).first()
@@ -157,22 +151,19 @@ async def repo_status_ws(
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
 
-        # 2. Start checking and pushing status updates
         last_status = None
         while True:
             status_info = get_repo_status(repo_id, user.id)
             current_status = status_info.get("status")
             
-            # Only send a message if the status actually changed to save bandwidth
             if current_status != last_status:
                 await websocket.send_json(status_info)
                 last_status = current_status
             
-            # Close connection automatically if the pipeline finishes or fails
             if current_status in ["success", "error", "not_found"]:
                 break
                 
-            await asyncio.sleep(2) # Server-side delay, taking the load off the frontend
+            await asyncio.sleep(2) 
             
     except JWTError:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
