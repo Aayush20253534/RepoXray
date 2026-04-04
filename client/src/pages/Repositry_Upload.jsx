@@ -726,12 +726,13 @@ const FilePreviewModal = ({ file, viewMode, setViewMode, onClose }) => {
   return (
     <AnimatePresence>
       <motion.div
-        key="file-modal"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/72 px-4 py-6 backdrop-blur-md"
-      >
+  key="file-modal"
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  exit={{ opacity: 0 }}
+  className="fixed inset-y-0 right-0 z-[100] flex items-center justify-center bg-black/72 px-4 py-6 backdrop-blur-md"
+  style={{ left: 'var(--sidebar-width, 78px)' }}
+>
         <motion.div
           initial={{ opacity: 0, y: 20, scale: 0.985 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
