@@ -1,0 +1,10 @@
+{
+  "3a0c13d8-ffa6-4415-85d2-f8962ea61883": {
+    "id": "3a0c13d8-ffa6-4415-85d2-f8962ea61883",
+    "cache_key": "761b896a-835c-49fa-b2ee-f0d91cf5afce::C:/Users/surya/repoxray/RepoXray/server::main.py",
+    "user_id": "761b896a-835c-49fa-b2ee-f0d91cf5afce",
+    "repo_clone": "C:/Users/surya/repoxray/RepoXray/server",
+    "file_path": "main.py",
+    "summary": "1. Purpose\n- This file serves as the primary entry point for the \"Explain My Codebase API\", a database-backed repository ingestion API.\n- It plays a central role in managing user interactions, repository ingestion, and code summarization.\n\n2. Core Functionality\n- The file implements API endpoints for user registration, login, repository ingestion, and code summarization.\n- It handles authentication, authorization, and error handling for these operations.\n\n3. Key Components\n- `get_db`: Returns a database session.\n- `get_current_user`: Authenticates and returns the current user.\n- `summarize`: Summarizes a file in a repository.\n- `signup`: Registers a new user.\n- `login`: Authenticates a user and returns an access token.\n\n4. Dependencies & Integrations\n- FastAPI: Used for building the API.\n- SQLAlchemy: Used for database interactions.\n- Pydantic: Used for data validation.\n- OAuth2: Used for authentication.\n\n5. Code Characteristics\n- The file uses an object-oriented programming (OOP) pattern with asynchronous operations.\n- It employs a modular design, separating concerns into distinct functions and endpoints."
+  }
+}

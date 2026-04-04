@@ -12,6 +12,7 @@ from Repo_clone import get_repo_status, start_clone_job
 import schemas
 from schemas import UserCreate, IngestRequest
 from jose import JWTError, jwt
+from sample_groq import summarize_file
 import models
 from dotenv import load_dotenv
 
@@ -39,6 +40,12 @@ def get_db():
     finally:
         db.close()
 
+
+class SummaryRequest(BaseModel):
+    user_id: str
+    repo_clone: str   # local path to the cloned repo, e.g. "/tmp/repos/my-repo"
+    file_path: str
+
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -57,6 +64,37 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if user is None:
         raise credentials_exception
     return user
+
+@app.post("/summarize")
+def summarize(request: SummaryRequest):
+    try:
+        result = summarize_file(
+            user_id=request.user_id,
+            repo_clone=request.repo_clone,
+            file_path=request.file_path,
+        )
+        return {
+            "success": True,
+            "cached": result["cached"],
+            "id": result["id"],
+            "file_path": request.file_path,
+            "summary": result["summary"],
+        }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/summaries/{user_id}")
+def get_user_summaries(user_id: str):
+    """Fetch all cached summaries for a given user."""
+    import json, os
+    if not os.path.exists("uuid_summary.json"):
+        return {"summaries": []}
+    with open("uuid_summary.json") as f:
+        all_data = json.load(f)
+    user_entries = [v for v in all_data.values() if v.get("user_id") == user_id]
+    return {"summaries": user_entries}
 
 @app.post("/signup", status_code=status.HTTP_201_CREATED)
 def signup(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
