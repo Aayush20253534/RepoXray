@@ -287,7 +287,7 @@ async def get_repo_summary(
             detail=f"Summary data not ready yet. Current status: {status_info.get('status')}"
         )
 
-    file_path = os.path.join("Repo_Codes_data", f"{repo_id}_summary.json")
+    file_path = os.path.join("Repo_Codes_data", f"{repo_id}_analysis.json")
     if not os.path.exists(file_path):
         raise HTTPException(status_code=500, detail="Summary JSON file is missing from the server.")
         
