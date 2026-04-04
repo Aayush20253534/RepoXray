@@ -38,7 +38,7 @@ GROQ_API_KEY = _load_groq_api_key()
 if GROQ_API_KEY:
     llm = ChatGroq(
         temperature=0.1, 
-        model_name="meta-llama/llama-4-scout-17b-16e-instruct", 
+        model_name="meta-llama/llama-4-scout-17b-16e-instruct", # Using a standard model name, update if using custom scout
         api_key=GROQ_API_KEY,
         max_retries=2,
         model_kwargs={"response_format": {"type": "json_object"}}
@@ -54,7 +54,7 @@ MAX_FILE_SIZE_BYTES = 50000  # Skip or truncate files larger than ~50KB
 # --- LangChain Schema Definition ---
 class FileAnalysis(BaseModel):
     purpose: str = Field(description="A brief 1-2 sentence description of what this file does.")
-    libraries_used: List[str] = Field(description="Array of strings representing main imports/dependencies.")
+    libraries_used: List[str] = Field(description="Array of strings representing main external imports/dependencies (e.g., 'react', 'os', 'fastapi').")
     coding_pattern: str = Field(description="String (e.g., 'React Component', 'FastAPI Router', 'Utility function', 'Singleton').")
     project_role: str = Field(description="String ('frontend', 'backend', 'database', 'config', 'docs', or 'other').")
     key_functions: List[str] = Field(description="Array of strings representing names of the main functions or classes defined here.")
@@ -69,7 +69,10 @@ prompt_template = PromptTemplate(
     
     Analyze the following file named '{filename}'. 
     
-    If the file is documentation (like README.md, .txt, or config files), summarize its purpose in the "purpose" field, set "project_role" to "docs" or "config", and return empty arrays/Unknown for the code-specific fields.
+    Task:
+    1. Summarize its purpose.
+    2. Identify external libraries used.
+    3. If the file is documentation (like README.md, .txt, or config files), set "project_role" to "docs" or "config", and return empty arrays/Unknown for the code-specific fields.
 
     File Content:
     {file_content}
@@ -108,10 +111,25 @@ def get_file_language(extension: str) -> str:
     }
     return ext_map.get(extension.lower(), "Unknown")
 
+def get_all_repo_files(current_path: Path, base_path: Path) -> List[str]:
+    """Gather all valid file paths in the repository."""
+    file_list = []
+    try:
+        items = sorted(current_path.iterdir(), key=lambda x: (x.is_file(), x.name))
+        for item in items:
+            if item.name in IGNORE_DIRS or item.name.startswith('.'):
+                continue
+            if item.is_dir():
+                file_list.extend(get_all_repo_files(item, base_path))
+            elif item.is_file() and is_text_file(item):
+                relative_path = item.relative_to(base_path).as_posix()
+                file_list.append(relative_path)
+    except PermissionError:
+        pass
+    return file_list
+
 def ask_groq_for_xray(file_content: str, filename: str) -> Dict[str, Any]:
-    """
-    Calls the Groq API via LangChain to analyze the file content.
-    """
+    """Calls the Groq API via LangChain to analyze the file content."""
     if analysis_chain is None:
         return {
             "purpose": "Groq API key not configured. Analysis skipped.",
@@ -125,7 +143,6 @@ def ask_groq_for_xray(file_content: str, filename: str) -> Dict[str, Any]:
         file_content = file_content[:15000] + "\n...[TRUNCATED FOR SIZE]"
 
     try:
-        # Invoke the LangChain pipeline
         result = analysis_chain.invoke({
             "filename": filename,
             "file_content": file_content
@@ -177,27 +194,8 @@ def analyze_file(filepath: Path) -> Dict[str, Any]:
 
     return metadata
 
-def generate_flat_repo_map(current_path: Path, base_path: Path, repo_map: Dict[str, Any]) -> None:
-    """Recursively walks the directory and builds a flat map of files."""
-    try:
-        items = sorted(current_path.iterdir(), key=lambda x: (x.is_file(), x.name))
-        
-        for item in items:
-            if item.name in IGNORE_DIRS or item.name.startswith('.'):
-                continue
-                
-            if item.is_dir():
-                generate_flat_repo_map(item, base_path, repo_map)
-            elif item.is_file():
-                relative_path_key = item.relative_to(base_path).as_posix()
-                print(f"  -> X-Raying: {relative_path_key}")
-                repo_map[relative_path_key] = analyze_file(item)
-                
-    except PermissionError:
-        pass
-
 def run_repo_xray(repo_id: str, clone_path_str: str, output_dir: str = "./Repo_Codes_data"):
-    """Main entry point to scan the repo and save the flat JSON map."""
+    """Main entry point to scan the repo and build the flat JSON map."""
     clone_path = Path(clone_path_str)
     
     if not clone_path.exists():
@@ -206,15 +204,26 @@ def run_repo_xray(repo_id: str, clone_path_str: str, output_dir: str = "./Repo_C
     os.makedirs(output_dir, exist_ok=True)
     output_file = Path(output_dir) / f"{repo_id}.json"
 
-    print(f"\n[STARTING X-RAY] Scanning repository: {repo_id}")
+    print(f"\n[PASS 1] Discovering files in repository: {repo_id}...")
+    all_files_list = get_all_repo_files(clone_path, clone_path)
+    print(f"Discovered {len(all_files_list)} parsable files.")
+
+    print(f"\n[PASS 2] X-Raying files and extracting metadata...")
+    repo_tree = {}
     
-    flat_repo_map = {}
-    generate_flat_repo_map(clone_path, clone_path, flat_repo_map)
-    
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(flat_repo_map, f, indent=4)
+    # Iterate through the discovered files
+    for file_path_str in all_files_list:
+        print(f"  -> X-Raying: {file_path_str}")
+        full_path = clone_path / file_path_str
         
-    print(f"[X-RAY COMPLETE] Results saved to: {output_file}")
+        # Analyze file and add to the flat dictionary
+        repo_tree[file_path_str] = analyze_file(full_path)
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(repo_tree, f, indent=4)
+        
+    print(f"[X-RAY COMPLETE] Extracted metadata for {len(repo_tree)} files.")
+    print(f"Results saved to: {output_file}")
     return str(output_file)
 
 if __name__ == "__main__":

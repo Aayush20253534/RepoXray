@@ -1,6 +1,7 @@
 import os
 import stat
 import time
+import uuid
 import subprocess
 import threading
 import shutil
@@ -199,3 +200,37 @@ def get_repo_status(repo_id: str, owner_id: int) -> Dict[str, str]:
         }
     finally:
         db.close()
+
+if __name__ == "__main__":
+    # Test configuration
+    test_github_url = "https://github.com/Aayush20253534/RepoXray.git"
+    test_repo_id = str(uuid.uuid4())
+    test_owner_id = 1  # Dummy owner ID for testing
+    
+    print(f"--- Starting Test for Repo Clone ---")
+    print(f"Target URL: {test_github_url}")
+    print(f"Repo ID: {test_repo_id}")
+    print(f"Owner ID: {test_owner_id}\n")
+    
+    try:
+        # Start the clone job
+        job_info = start_clone_job(test_github_url, test_repo_id, test_owner_id)
+        print(f"Job Initialized: {job_info}\n")
+        
+        # Poll status until success or error
+        while True:
+            status_info = get_repo_status(test_repo_id, test_owner_id)
+            current_status = status_info.get("status")
+            
+            print(f"[{current_status.upper()}] {status_info.get('message')}")
+            
+            if current_status in ["success", "error", "not_found"]:
+                break
+                
+            time.sleep(3) # Wait before checking again
+            
+        print("\n--- Test Complete ---")
+        
+    except Exception as e:
+        print(f"\nTest failed with exception: {e}")
+        print("Note: Ensure your database (SessionLocal, Repository) is fully initialized before running this test.")

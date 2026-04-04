@@ -32,6 +32,8 @@ import {
   Handle,
   Position,
   MarkerType,
+  useNodesState,
+  useEdgesState,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -474,6 +476,8 @@ const LoadingBuffer = ({ onComplete }) => {
     };
   }, [onComplete]);
 
+  const orbitDots = Array.from({ length: 10 });
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -483,69 +487,143 @@ const LoadingBuffer = ({ onComplete }) => {
     >
       <div className="relative w-full max-w-5xl overflow-hidden rounded-[36px] border border-white/10 bg-black/30 px-6 py-14 backdrop-blur-2xl md:px-12">
         <div className="absolute inset-0">
-          <div className="absolute left-1/2 top-1/2 h-[480px] w-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple-600/10 blur-[140px]" />
-          <div className="absolute left-1/2 top-1/2 h-[340px] w-[340px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-500/10 blur-[110px]" />
+          <div className="absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple-600/12 blur-[150px]" />
+          <div className="absolute left-1/2 top-1/2 h-[380px] w-[380px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-500/12 blur-[120px]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.05),transparent_58%)]" />
         </div>
 
         <div className="relative z-10 flex flex-col items-center">
-          <div className="relative flex h-[320px] w-[320px] items-center justify-center">
+          <div className="relative flex h-[360px] w-[360px] items-center justify-center">
+            {/* outer soft pulse */}
+            <motion.div
+              animate={{ scale: [1, 1.06, 1], opacity: [0.2, 0.35, 0.2] }}
+              transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute inset-0 rounded-full border border-purple-500/10 bg-purple-500/5 blur-[2px]"
+            />
+
+            {/* orbit ring 1 */}
             <motion.div
               animate={{ rotate: 360 }}
-              transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+              transition={{ duration: 16, repeat: Infinity, ease: 'linear' }}
               className="absolute inset-0 rounded-full border border-dashed border-purple-500/30"
-            />
+            >
+              <div className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rounded-full bg-purple-400 shadow-[0_0_22px_rgba(168,85,247,0.95)]" />
+              <div className="absolute left-8 top-[22%] h-2.5 w-2.5 rounded-full bg-fuchsia-300 shadow-[0_0_16px_rgba(217,70,239,0.8)]" />
+            </motion.div>
+
+            {/* orbit ring 2 */}
+            <motion.div
+              animate={{ rotate: -360 }}
+              transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+              className="absolute inset-[24px] rounded-full border border-cyan-500/25"
+            >
+              <div className="absolute right-10 top-[12%] h-3.5 w-3.5 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(34,211,238,0.95)]" />
+              <div className="absolute bottom-8 left-[18%] h-2 w-2 rounded-full bg-sky-300 shadow-[0_0_14px_rgba(56,189,248,0.8)]" />
+            </motion.div>
+
+            {/* orbit ring 3 */}
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 22, repeat: Infinity, ease: 'linear' }}
+              className="absolute inset-[50px] rounded-full border border-blue-500/20 border-dashed"
+            >
+              <div className="absolute left-1/2 top-0 h-3 w-3 -translate-x-1/2 rounded-full bg-blue-300 shadow-[0_0_16px_rgba(96,165,250,0.9)]" />
+            </motion.div>
+
+            {/* segmented arc ring */}
             <motion.div
               animate={{ rotate: -360 }}
               transition={{ duration: 7, repeat: Infinity, ease: 'linear' }}
-              className="absolute inset-6 rounded-full border border-cyan-500/30"
-            />
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 13, repeat: Infinity, ease: 'linear' }}
-              className="absolute inset-12 rounded-full border border-blue-500/20"
-            />
-
-            <motion.div
-              animate={{ scale: [1, 1.1, 1] }}
-              transition={{ duration: 2.4, repeat: Infinity }}
-              className="absolute h-28 w-28 rounded-full bg-purple-500/20 blur-3xl"
-            />
-            <motion.div
-              animate={{ scale: [1, 1.14, 1] }}
-              transition={{ duration: 2.8, repeat: Infinity }}
-              className="absolute h-36 w-36 rounded-full bg-cyan-500/10 blur-3xl"
+              className="absolute inset-[78px] rounded-full"
+              style={{
+                background:
+                  'conic-gradient(from 0deg, rgba(168,85,247,0.95) 0deg, rgba(34,211,238,0.85) 90deg, transparent 120deg, transparent 220deg, rgba(59,130,246,0.85) 270deg, rgba(168,85,247,0.95) 320deg, transparent 360deg)',
+                WebkitMask:
+                  'radial-gradient(farthest-side, transparent calc(100% - 8px), white calc(100% - 7px))',
+                mask:
+                  'radial-gradient(farthest-side, transparent calc(100% - 8px), white calc(100% - 7px))',
+              }}
             />
 
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05]">
+            {/* floating tiny particles */}
+            {orbitDots.map((_, i) => (
+              <motion.div
+                key={i}
+                animate={{
+                  y: [0, -10, 0],
+                  opacity: [0.25, 0.8, 0.25],
+                }}
+                transition={{
+                  duration: 2 + i * 0.18,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                  delay: i * 0.12,
+                }}
+                className="absolute rounded-full bg-white"
+                style={{
+                  width: `${2 + (i % 3)}px`,
+                  height: `${2 + (i % 3)}px`,
+                  top: `${18 + ((i * 7) % 64)}%`,
+                  left: `${14 + ((i * 9) % 70)}%`,
+                  boxShadow: '0 0 12px rgba(255,255,255,0.45)',
+                }}
+              />
+            ))}
+
+            {/* core glow */}
+            <motion.div
+              animate={{ scale: [1, 1.12, 1], opacity: [0.55, 0.8, 0.55] }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute h-32 w-32 rounded-full bg-purple-500/20 blur-3xl"
+            />
+            <motion.div
+              animate={{ scale: [1, 1.16, 1], opacity: [0.35, 0.55, 0.35] }}
+              transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute h-44 w-44 rounded-full bg-cyan-500/12 blur-3xl"
+            />
+
+            {/* central orb */}
+            <motion.div
+              animate={{ scale: [1, 1.03, 1] }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+              className="relative z-10 flex h-[120px] w-[120px] flex-col items-center justify-center rounded-full border border-white/10 bg-white/[0.05] shadow-[0_0_60px_rgba(168,85,247,0.15)] backdrop-blur-xl"
+            >
+              <motion.div
+                animate={{ scale: [1, 1.08, 1] }}
+                transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+                className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-purple-500/20 via-cyan-500/10 to-blue-500/20"
+              >
                 <Orbit className="h-8 w-8 text-white" />
-              </div>
-              <div className="text-5xl font-bold text-white">{progress}%</div>
-              <div className="mt-2 text-[11px] uppercase tracking-[0.35em] text-neutral-500">
-                Processing
-              </div>
-            </div>
+              </motion.div>
+{/* 
+              <div className="text-xl font-semibold tracking-tight text-white leading-none">
+                {progress}%
+              </div> */}
+            </motion.div>
           </div>
 
           <AnimatePresence mode="wait">
             <motion.p
               key={statusIndex}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className="mt-4 text-center text-sm font-medium text-purple-300 md:text-base"
+              initial={{ opacity: 0, y: 8, filter: 'blur(6px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -8, filter: 'blur(6px)' }}
+              transition={{ duration: 0.35 }}
+              className="mt-5 text-center text-sm font-medium text-purple-300 md:text-base"
             >
               {statuses[statusIndex]}
             </motion.p>
           </AnimatePresence>
 
           <div className="mt-8 w-full max-w-xl">
-            <div className="h-2 overflow-hidden rounded-full border border-white/5 bg-neutral-900">
+            <div className="h-2.5 overflow-hidden rounded-full border border-white/5 bg-neutral-900">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
-                className="h-full bg-gradient-to-r from-purple-500 via-cyan-500 to-blue-500"
-              />
+                className="relative h-full bg-gradient-to-r from-purple-500 via-cyan-500 to-blue-500"
+              >
+                <div className="absolute inset-y-0 right-0 w-16 bg-white/20 blur-md" />
+              </motion.div>
             </div>
           </div>
         </div>
@@ -648,12 +726,13 @@ const FilePreviewModal = ({ file, viewMode, setViewMode, onClose }) => {
   return (
     <AnimatePresence>
       <motion.div
-        key="file-modal"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/72 px-4 py-6 backdrop-blur-md"
-      >
+  key="file-modal"
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  exit={{ opacity: 0 }}
+  className="fixed inset-y-0 right-0 z-[100] flex items-center justify-center bg-black/72 px-4 py-6 backdrop-blur-md"
+  style={{ left: 'var(--sidebar-width, 78px)' }}
+>
         <motion.div
           initial={{ opacity: 0, y: 20, scale: 0.985 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -818,35 +897,40 @@ const FilePreviewModal = ({ file, viewMode, setViewMode, onClose }) => {
 };
 
 
-const DependencyNode = ({ data }) => {
+const DependencyNode = ({ data, selected }) => {
   const Icon = data.icon || Cpu;
 
   return (
-    <div className="min-w-[210px] rounded-2xl border border-white/10 bg-[#0d1117]/95 px-4 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+    <motion.div
+      whileHover={{ scale: 1.04 }}
+      whileTap={{ scale: 0.98 }}
+      className={`w-[180px] cursor-pointer rounded-2xl border px-4 py-3 backdrop-blur-xl transition-all duration-300 ${
+        selected
+          ? 'border-cyan-400/50 bg-[#101826] shadow-[0_0_30px_rgba(34,211,238,0.18)]'
+          : 'border-white/10 bg-[#0d1117]/95 shadow-[0_10px_35px_rgba(0,0,0,0.32)] hover:border-cyan-400/30 hover:shadow-[0_0_22px_rgba(34,211,238,0.10)]'
+      }`}
+    >
       <Handle
         type="target"
         position={Position.Top}
         className="!h-3 !w-3 !border-2 !border-[#0d1117] !bg-purple-400"
       />
 
-      <div className="flex items-start gap-3">
-        <div className={`rounded-xl border px-2.5 py-2 ${data.iconWrapClass || 'border-purple-500/20 bg-purple-500/10'}`}>
+      <div className="flex items-center gap-3">
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+            data.iconWrapClass || 'border-purple-500/20 bg-purple-500/10'
+          }`}
+        >
           <Icon className={`h-4 w-4 ${data.iconClass || 'text-purple-300'}`} />
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-white">{data.label}</div>
-          <div className="mt-1 text-xs leading-5 text-neutral-400">{data.description}</div>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            {data.tags?.map((tag, index) => (
-              <span
-                key={`${tag}-${index}`}
-                className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-neutral-300"
-              >
-                {tag}
-              </span>
-            ))}
+          <div className="truncate text-sm font-semibold text-white">
+            {data.label}
+          </div>
+          <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.18em] text-neutral-400">
+            {data.fileType}
           </div>
         </div>
       </div>
@@ -856,7 +940,7 @@ const DependencyNode = ({ data }) => {
         position={Position.Bottom}
         className="!h-3 !w-3 !border-2 !border-[#0d1117] !bg-cyan-400"
       />
-    </div>
+    </motion.div>
   );
 };
 
@@ -868,12 +952,11 @@ const dependencyNodesData = [
   {
     id: 'root',
     type: 'dependencyNode',
-    position: { x: 420, y: 20 },
+    position: { x: 520, y: 20 },
     data: {
-      label: 'RepoXray Frontend',
-      description: 'Core application shell coordinating repository upload, loading flow, and intelligence views.',
+      label: 'App.jsx',
+      fileType: 'Frontend',
       icon: Layers3,
-      tags: ['root', 'app shell'],
       iconWrapClass: 'border-purple-500/20 bg-purple-500/10',
       iconClass: 'text-purple-300',
     },
@@ -881,12 +964,11 @@ const dependencyNodesData = [
   {
     id: 'react',
     type: 'dependencyNode',
-    position: { x: 90, y: 190 },
+    position: { x: 60, y: 210 },
     data: {
       label: 'react',
-      description: 'Component model, state, effects, and overall UI rendering engine.',
+      fileType: 'Frontend',
       icon: Cpu,
-      tags: ['ui core', 'state'],
       iconWrapClass: 'border-cyan-500/20 bg-cyan-500/10',
       iconClass: 'text-cyan-300',
     },
@@ -894,12 +976,11 @@ const dependencyNodesData = [
   {
     id: 'router',
     type: 'dependencyNode',
-    position: { x: 340, y: 190 },
+    position: { x: 380, y: 210 },
     data: {
       label: 'react-router-dom',
-      description: 'Page routing layer for upload and results experience.',
+      fileType: 'Frontend',
       icon: ArrowRight,
-      tags: ['routing', 'navigation'],
       iconWrapClass: 'border-blue-500/20 bg-blue-500/10',
       iconClass: 'text-blue-300',
     },
@@ -907,12 +988,11 @@ const dependencyNodesData = [
   {
     id: 'motion',
     type: 'dependencyNode',
-    position: { x: 600, y: 190 },
+    position: { x: 700, y: 210 },
     data: {
       label: 'framer-motion',
-      description: 'Smooth transitions, animated loading buffer, and modal choreography.',
+      fileType: 'Frontend',
       icon: Orbit,
-      tags: ['animation', 'motion'],
       iconWrapClass: 'border-fuchsia-500/20 bg-fuchsia-500/10',
       iconClass: 'text-fuchsia-300',
     },
@@ -920,12 +1000,11 @@ const dependencyNodesData = [
   {
     id: 'xyflow',
     type: 'dependencyNode',
-    position: { x: 850, y: 190 },
+    position: { x: 1020, y: 210 },
     data: {
       label: '@xyflow/react',
-      description: 'Interactive dependency graph engine for node-edge visualization.',
+      fileType: 'Frontend',
       icon: Network,
-      tags: ['graph', 'interactive'],
       iconWrapClass: 'border-emerald-500/20 bg-emerald-500/10',
       iconClass: 'text-emerald-300',
     },
@@ -933,12 +1012,11 @@ const dependencyNodesData = [
   {
     id: 'lucide',
     type: 'dependencyNode',
-    position: { x: 210, y: 390 },
+    position: { x: 220, y: 430 },
     data: {
       label: 'lucide-react',
-      description: 'Iconography layer powering UI labels, stats, tabs, and node visuals.',
+      fileType: 'Frontend',
       icon: BadgeInfo,
-      tags: ['icons', 'ui'],
       iconWrapClass: 'border-amber-500/20 bg-amber-500/10',
       iconClass: 'text-amber-300',
     },
@@ -946,12 +1024,11 @@ const dependencyNodesData = [
   {
     id: 'tailwind',
     type: 'dependencyNode',
-    position: { x: 510, y: 390 },
+    position: { x: 540, y: 430 },
     data: {
       label: 'tailwindcss',
-      description: 'Utility styling system shaping the glassmorphism and dashboard layout.',
+      fileType: 'Frontend',
       icon: Hash,
-      tags: ['styling', 'design system'],
       iconWrapClass: 'border-pink-500/20 bg-pink-500/10',
       iconClass: 'text-pink-300',
     },
@@ -959,104 +1036,176 @@ const dependencyNodesData = [
   {
     id: 'pages',
     type: 'dependencyNode',
-    position: { x: 810, y: 390 },
+    position: { x: 860, y: 430 },
     data: {
-      label: 'Pages / UI Modules',
-      description: 'Upload page, results page, file preview modal, and directory explorer.',
+      label: 'RepositoryResultsPage.jsx',
+      fileType: 'Frontend',
       icon: FolderTree,
-      tags: ['pages', 'modules'],
       iconWrapClass: 'border-indigo-500/20 bg-indigo-500/10',
       iconClass: 'text-indigo-300',
     },
   },
 ];
-
 const dependencyEdgesData = [
   {
     id: 'e-root-react',
     source: 'root',
     target: 'react',
     type: 'smoothstep',
-    markerEnd: { type: MarkerType.ArrowClosed },
     animated: true,
-    style: { stroke: '#8b5cf6', strokeWidth: 2.2 },
+    markerEnd: { type: MarkerType.ArrowClosed },
+    style: {
+      stroke: '#8b5cf6',
+      strokeWidth: 2.2,
+      strokeDasharray: '7 7',
+    },
   },
   {
     id: 'e-root-router',
     source: 'root',
     target: 'router',
     type: 'smoothstep',
-    markerEnd: { type: MarkerType.ArrowClosed },
     animated: true,
-    style: { stroke: '#38bdf8', strokeWidth: 2.2 },
+    markerEnd: { type: MarkerType.ArrowClosed },
+    style: {
+      stroke: '#38bdf8',
+      strokeWidth: 2.2,
+      strokeDasharray: '7 7',
+    },
   },
   {
     id: 'e-root-motion',
     source: 'root',
     target: 'motion',
     type: 'smoothstep',
-    markerEnd: { type: MarkerType.ArrowClosed },
     animated: true,
-    style: { stroke: '#c084fc', strokeWidth: 2.2 },
+    markerEnd: { type: MarkerType.ArrowClosed },
+    style: {
+      stroke: '#c084fc',
+      strokeWidth: 2.2,
+      strokeDasharray: '7 7',
+    },
   },
   {
     id: 'e-root-xyflow',
     source: 'root',
     target: 'xyflow',
     type: 'smoothstep',
-    markerEnd: { type: MarkerType.ArrowClosed },
     animated: true,
-    style: { stroke: '#34d399', strokeWidth: 2.2 },
+    markerEnd: { type: MarkerType.ArrowClosed },
+    style: {
+      stroke: '#34d399',
+      strokeWidth: 2.2,
+      strokeDasharray: '7 7',
+    },
   },
   {
     id: 'e-react-lucide',
     source: 'react',
     target: 'lucide',
     type: 'smoothstep',
+    animated: true,
     markerEnd: { type: MarkerType.ArrowClosed },
-    style: { stroke: '#f59e0b', strokeWidth: 2 },
+    style: {
+      stroke: '#f59e0b',
+      strokeWidth: 2,
+      strokeDasharray: '7 7',
+    },
   },
   {
     id: 'e-router-pages',
     source: 'router',
     target: 'pages',
     type: 'smoothstep',
+    animated: true,
     markerEnd: { type: MarkerType.ArrowClosed },
-    style: { stroke: '#6366f1', strokeWidth: 2 },
+    style: {
+      stroke: '#6366f1',
+      strokeWidth: 2,
+      strokeDasharray: '7 7',
+    },
   },
   {
     id: 'e-motion-tailwind',
     source: 'motion',
     target: 'tailwind',
     type: 'smoothstep',
+    animated: true,
     markerEnd: { type: MarkerType.ArrowClosed },
-    style: { stroke: '#ec4899', strokeWidth: 2 },
+    style: {
+      stroke: '#ec4899',
+      strokeWidth: 2,
+      strokeDasharray: '7 7',
+    },
   },
   {
     id: 'e-xyflow-pages',
     source: 'xyflow',
     target: 'pages',
     type: 'smoothstep',
+    animated: true,
     markerEnd: { type: MarkerType.ArrowClosed },
-    style: { stroke: '#10b981', strokeWidth: 2 },
+    style: {
+      stroke: '#10b981',
+      strokeWidth: 2,
+      strokeDasharray: '7 7',
+    },
   },
   {
     id: 'e-tailwind-pages',
     source: 'tailwind',
     target: 'pages',
     type: 'smoothstep',
+    animated: true,
     markerEnd: { type: MarkerType.ArrowClosed },
-    style: { stroke: '#a855f7', strokeWidth: 2 },
+    style: {
+      stroke: '#a855f7',
+      strokeWidth: 2,
+      strokeDasharray: '7 7',
+    },
   },
 ];
-
 const ResultsStage = () => {
   const [activeTab, setActiveTab] = useState('directory');
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileViewMode, setFileViewMode] = useState('summary');
+ const [selectedDependencyNode, setSelectedDependencyNode] = useState(null);
 
-  const flowNodes = useMemo(() => dependencyNodesData, []);
-  const flowEdges = useMemo(() => dependencyEdgesData, []);
+const initialNodes = useMemo(
+  () =>
+    dependencyNodesData.map((node) => ({
+      ...node,
+      selected: false,
+    })),
+  []
+);
+
+const initialEdges = useMemo(() => dependencyEdgesData, []);
+
+const [flowNodes, setFlowNodes, onNodesChange] = useNodesState(initialNodes);
+const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+useEffect(() => {
+  setFlowNodes((nodes) =>
+    nodes.map((node) => ({
+      ...node,
+      selected: node.id === selectedDependencyNode,
+    }))
+  );
+}, [selectedDependencyNode, setFlowNodes]);
+
+const resetDependencyGraph = () => {
+  setSelectedDependencyNode(null);
+
+  setFlowNodes(
+    dependencyNodesData.map((node) => ({
+      ...node,
+      selected: false,
+    }))
+  );
+
+  setFlowEdges(dependencyEdgesData);
+};
 
   const openFileModal = (file) => {
     setSelectedFile(file);
@@ -1147,46 +1296,60 @@ const ResultsStage = () => {
   >
     <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-4">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <div>
-          <div className="text-sm font-semibold text-white">Interactive Dependency Tree</div>
-          <div className="mt-1 text-sm text-neutral-400">
-            Pan, zoom, and inspect how the core libraries branch through the app architecture.
-          </div>
-        </div>
+  <div>
+    <div className="text-sm font-semibold text-white">Interactive Dependency Tree</div>
+    <div className="mt-1 text-sm text-neutral-400">
+      Pan, zoom, drag nodes freely, and reset the layout anytime.
+    </div>
+  </div>
 
-        <div className="hidden md:flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-neutral-400">
-          <Network className="h-3.5 w-3.5 text-cyan-300" />
-          Tree Mode
-        </div>
-      </div>
+  <div className="flex items-center gap-2">
+    <div className="hidden md:flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-neutral-400">
+      <Network className="h-3.5 w-3.5 text-cyan-300" />
+      Tree Mode
+    </div>
 
-      <div className="mt-4 overflow-hidden rounded-2xl border border-white/8 bg-[#07090f]">
-        <div className="h-[470px] w-full">
-          <ReactFlow
-            nodes={flowNodes}
-            edges={flowEdges}
-            nodeTypes={dependencyNodeTypes}
-            fitView
-            fitViewOptions={{ padding: 0.18 }}
-            minZoom={0.55}
-            maxZoom={1.5}
-            proOptions={{ hideAttribution: true }}
-            nodesDraggable={true}
-            nodesConnectable={false}
-            elementsSelectable={true}
-            panOnDrag={true}
-            zoomOnScroll={true}
-          >
-            <MiniMap
-              pannable
-              zoomable
-              className="!bg-black/40 !border !border-white/10 !rounded-xl"
-            />
-            <Controls className="!bg-black/40 !border !border-white/10 !rounded-xl !overflow-hidden" />
-            <Background gap={22} size={1} color="#1f2937" />
-          </ReactFlow>
-        </div>
-      </div>
+    <button
+      type="button"
+      onClick={resetDependencyGraph}
+      className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300 transition-all hover:border-cyan-400/40 hover:bg-cyan-500/15 hover:text-white"
+    >
+      <Orbit className="h-3.5 w-3.5" />
+      Reset Graph
+    </button>
+  </div>
+</div>
+
+     <div className="mt-4 overflow-hidden rounded-2xl border border-white/8 bg-[#07090f]">
+  <div className="h-[620px] w-full">
+   <ReactFlow
+  nodes={flowNodes}
+  edges={flowEdges}
+  onNodesChange={onNodesChange}
+  onEdgesChange={onEdgesChange}
+  nodeTypes={dependencyNodeTypes}
+  fitView
+  fitViewOptions={{ padding: 0.28 }}
+  minZoom={0.5}
+  maxZoom={1.8}
+  defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+  proOptions={{ hideAttribution: true }}
+  nodesDraggable
+  nodesConnectable={false}
+  elementsSelectable
+  panOnDrag
+  zoomOnScroll
+  zoomOnPinch
+  zoomOnDoubleClick
+  panOnScroll={false}
+  selectionOnDrag={false}
+  onNodeClick={(_, node) => setSelectedDependencyNode(node.id)}
+  onPaneClick={() => setSelectedDependencyNode(null)}
+>
+      <Background gap={22} size={1} color="#1f2937" />
+    </ReactFlow>
+  </div>
+</div>
     </div>
   </motion.div>
 )}
@@ -1246,7 +1409,7 @@ export default function RepositoryIntelligencePage() {
                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-blue-500 shadow-[0_0_30px_rgba(168,85,247,0.3)]">
                       <Layers3 className="h-5 w-5 text-white" />
                     </div>
-                    <div className="flex flex-col leading-none">
+                    <div className="flex flex-col leading-tight gap-[8px]">
   <div className="text-lg font-bold text-white">
     RepoXray Intelligence Engine
   </div>
