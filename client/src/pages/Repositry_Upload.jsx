@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   
@@ -26,6 +26,14 @@ import {
 } from 'lucide-react';
 import * as Icons from "lucide-react";
 import Sidebar from '../components/sidebar';
+import {
+  ReactFlow,
+  Background,
+  Handle,
+  Position,
+  MarkerType,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 
 // ==========================
 // Shared UI
@@ -328,11 +336,11 @@ const UploadStage = ({ repoUrl, setRepoUrl, onAnalyze }) => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -18 }}
       transition={{ duration: 0.55 }}
-      className="mx-auto flex min-h-[calc(100vh-110px)] max-w-6xl items-center"
+      className="mx-auto flex min-h-[calc(100vh-110px)] max-w-6xl items-start pt-0"
     >
-      <div className="grid w-full grid-cols-1 gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="flex flex-col justify-center">
-          <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.28em] text-purple-300">
+      <div className="grid w-full grid-cols-1 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="flex flex-col justify-start pt-4">
+          <div className="mb-1 inline-flex w-fit items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.28em] text-purple-300">
             <Cpu className="h-3.5 w-3.5" />
             Repository Intelligence
           </div>
@@ -357,7 +365,7 @@ const UploadStage = ({ repoUrl, setRepoUrl, onAnalyze }) => {
         </div>
 
         <GlassCard glow="purple" className="p-1">
-          <div className="rounded-[26px] border border-white/5 bg-black/35 p-6 md:p-8">
+          <div className="rounded-[26px] border border-white/5 bg-black/35 p-4 md:p-4">
             <div className="mb-6">
               <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-neutral-500">
                 GitHub Repository Link
@@ -809,10 +817,246 @@ const FilePreviewModal = ({ file, viewMode, setViewMode, onClose }) => {
   );
 };
 
+
+const DependencyNode = ({ data }) => {
+  const Icon = data.icon || Cpu;
+
+  return (
+    <div className="min-w-[210px] rounded-2xl border border-white/10 bg-[#0d1117]/95 px-4 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!h-3 !w-3 !border-2 !border-[#0d1117] !bg-purple-400"
+      />
+
+      <div className="flex items-start gap-3">
+        <div className={`rounded-xl border px-2.5 py-2 ${data.iconWrapClass || 'border-purple-500/20 bg-purple-500/10'}`}>
+          <Icon className={`h-4 w-4 ${data.iconClass || 'text-purple-300'}`} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold text-white">{data.label}</div>
+          <div className="mt-1 text-xs leading-5 text-neutral-400">{data.description}</div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {data.tags?.map((tag, index) => (
+              <span
+                key={`${tag}-${index}`}
+                className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-neutral-300"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!h-3 !w-3 !border-2 !border-[#0d1117] !bg-cyan-400"
+      />
+    </div>
+  );
+};
+
+const dependencyNodeTypes = {
+  dependencyNode: DependencyNode,
+};
+
+const dependencyNodesData = [
+  {
+    id: 'root',
+    type: 'dependencyNode',
+    position: { x: 420, y: 20 },
+    data: {
+      label: 'RepoXray Frontend',
+      description: 'Core application shell coordinating repository upload, loading flow, and intelligence views.',
+      icon: Layers3,
+      tags: ['root', 'app shell'],
+      iconWrapClass: 'border-purple-500/20 bg-purple-500/10',
+      iconClass: 'text-purple-300',
+    },
+  },
+  {
+    id: 'react',
+    type: 'dependencyNode',
+    position: { x: 90, y: 190 },
+    data: {
+      label: 'react',
+      description: 'Component model, state, effects, and overall UI rendering engine.',
+      icon: Cpu,
+      tags: ['ui core', 'state'],
+      iconWrapClass: 'border-cyan-500/20 bg-cyan-500/10',
+      iconClass: 'text-cyan-300',
+    },
+  },
+  {
+    id: 'router',
+    type: 'dependencyNode',
+    position: { x: 340, y: 190 },
+    data: {
+      label: 'react-router-dom',
+      description: 'Page routing layer for upload and results experience.',
+      icon: ArrowRight,
+      tags: ['routing', 'navigation'],
+      iconWrapClass: 'border-blue-500/20 bg-blue-500/10',
+      iconClass: 'text-blue-300',
+    },
+  },
+  {
+    id: 'motion',
+    type: 'dependencyNode',
+    position: { x: 600, y: 190 },
+    data: {
+      label: 'framer-motion',
+      description: 'Smooth transitions, animated loading buffer, and modal choreography.',
+      icon: Orbit,
+      tags: ['animation', 'motion'],
+      iconWrapClass: 'border-fuchsia-500/20 bg-fuchsia-500/10',
+      iconClass: 'text-fuchsia-300',
+    },
+  },
+  {
+    id: 'xyflow',
+    type: 'dependencyNode',
+    position: { x: 850, y: 190 },
+    data: {
+      label: '@xyflow/react',
+      description: 'Interactive dependency graph engine for node-edge visualization.',
+      icon: Network,
+      tags: ['graph', 'interactive'],
+      iconWrapClass: 'border-emerald-500/20 bg-emerald-500/10',
+      iconClass: 'text-emerald-300',
+    },
+  },
+  {
+    id: 'lucide',
+    type: 'dependencyNode',
+    position: { x: 210, y: 390 },
+    data: {
+      label: 'lucide-react',
+      description: 'Iconography layer powering UI labels, stats, tabs, and node visuals.',
+      icon: BadgeInfo,
+      tags: ['icons', 'ui'],
+      iconWrapClass: 'border-amber-500/20 bg-amber-500/10',
+      iconClass: 'text-amber-300',
+    },
+  },
+  {
+    id: 'tailwind',
+    type: 'dependencyNode',
+    position: { x: 510, y: 390 },
+    data: {
+      label: 'tailwindcss',
+      description: 'Utility styling system shaping the glassmorphism and dashboard layout.',
+      icon: Hash,
+      tags: ['styling', 'design system'],
+      iconWrapClass: 'border-pink-500/20 bg-pink-500/10',
+      iconClass: 'text-pink-300',
+    },
+  },
+  {
+    id: 'pages',
+    type: 'dependencyNode',
+    position: { x: 810, y: 390 },
+    data: {
+      label: 'Pages / UI Modules',
+      description: 'Upload page, results page, file preview modal, and directory explorer.',
+      icon: FolderTree,
+      tags: ['pages', 'modules'],
+      iconWrapClass: 'border-indigo-500/20 bg-indigo-500/10',
+      iconClass: 'text-indigo-300',
+    },
+  },
+];
+
+const dependencyEdgesData = [
+  {
+    id: 'e-root-react',
+    source: 'root',
+    target: 'react',
+    type: 'smoothstep',
+    markerEnd: { type: MarkerType.ArrowClosed },
+    animated: true,
+    style: { stroke: '#8b5cf6', strokeWidth: 2.2 },
+  },
+  {
+    id: 'e-root-router',
+    source: 'root',
+    target: 'router',
+    type: 'smoothstep',
+    markerEnd: { type: MarkerType.ArrowClosed },
+    animated: true,
+    style: { stroke: '#38bdf8', strokeWidth: 2.2 },
+  },
+  {
+    id: 'e-root-motion',
+    source: 'root',
+    target: 'motion',
+    type: 'smoothstep',
+    markerEnd: { type: MarkerType.ArrowClosed },
+    animated: true,
+    style: { stroke: '#c084fc', strokeWidth: 2.2 },
+  },
+  {
+    id: 'e-root-xyflow',
+    source: 'root',
+    target: 'xyflow',
+    type: 'smoothstep',
+    markerEnd: { type: MarkerType.ArrowClosed },
+    animated: true,
+    style: { stroke: '#34d399', strokeWidth: 2.2 },
+  },
+  {
+    id: 'e-react-lucide',
+    source: 'react',
+    target: 'lucide',
+    type: 'smoothstep',
+    markerEnd: { type: MarkerType.ArrowClosed },
+    style: { stroke: '#f59e0b', strokeWidth: 2 },
+  },
+  {
+    id: 'e-router-pages',
+    source: 'router',
+    target: 'pages',
+    type: 'smoothstep',
+    markerEnd: { type: MarkerType.ArrowClosed },
+    style: { stroke: '#6366f1', strokeWidth: 2 },
+  },
+  {
+    id: 'e-motion-tailwind',
+    source: 'motion',
+    target: 'tailwind',
+    type: 'smoothstep',
+    markerEnd: { type: MarkerType.ArrowClosed },
+    style: { stroke: '#ec4899', strokeWidth: 2 },
+  },
+  {
+    id: 'e-xyflow-pages',
+    source: 'xyflow',
+    target: 'pages',
+    type: 'smoothstep',
+    markerEnd: { type: MarkerType.ArrowClosed },
+    style: { stroke: '#10b981', strokeWidth: 2 },
+  },
+  {
+    id: 'e-tailwind-pages',
+    source: 'tailwind',
+    target: 'pages',
+    type: 'smoothstep',
+    markerEnd: { type: MarkerType.ArrowClosed },
+    style: { stroke: '#a855f7', strokeWidth: 2 },
+  },
+];
+
 const ResultsStage = () => {
   const [activeTab, setActiveTab] = useState('directory');
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileViewMode, setFileViewMode] = useState('summary');
+
+  const flowNodes = useMemo(() => dependencyNodesData, []);
+  const flowEdges = useMemo(() => dependencyEdgesData, []);
 
   const openFileModal = (file) => {
     setSelectedFile(file);
@@ -894,30 +1138,58 @@ const ResultsStage = () => {
           )}
 
           {activeTab === 'dependencies' && (
-            <motion.div
-              key="dependencies"
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -14 }}
-              className="space-y-3"
-            >
-              {[
-                'react',
-                'framer-motion',
-                'lucide-react',
-                'tailwindcss',
-                'react-router-dom',
-              ].map((lib) => (
-                <div
-                  key={lib}
-                  className="flex items-center justify-between rounded-xl border border-neutral-800 bg-neutral-950/60 px-4 py-4 text-neutral-200"
-                >
-                  <span>{lib}</span>
-                  <ChevronRight className="h-4 w-4 text-neutral-600" />
-                </div>
-              ))}
-            </motion.div>
-          )}
+  <motion.div
+    key="dependencies"
+    initial={{ opacity: 0, y: 14 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -14 }}
+    className="space-y-4"
+  >
+    <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-4">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold text-white">Interactive Dependency Tree</div>
+          <div className="mt-1 text-sm text-neutral-400">
+            Pan, zoom, and inspect how the core libraries branch through the app architecture.
+          </div>
+        </div>
+
+        <div className="hidden md:flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-neutral-400">
+          <Network className="h-3.5 w-3.5 text-cyan-300" />
+          Tree Mode
+        </div>
+      </div>
+
+      <div className="mt-4 overflow-hidden rounded-2xl border border-white/8 bg-[#07090f]">
+        <div className="h-[470px] w-full">
+          <ReactFlow
+            nodes={flowNodes}
+            edges={flowEdges}
+            nodeTypes={dependencyNodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.18 }}
+            minZoom={0.55}
+            maxZoom={1.5}
+            proOptions={{ hideAttribution: true }}
+            nodesDraggable={true}
+            nodesConnectable={false}
+            elementsSelectable={true}
+            panOnDrag={true}
+            zoomOnScroll={true}
+          >
+            <MiniMap
+              pannable
+              zoomable
+              className="!bg-black/40 !border !border-white/10 !rounded-xl"
+            />
+            <Controls className="!bg-black/40 !border !border-white/10 !rounded-xl !overflow-hidden" />
+            <Background gap={22} size={1} color="#1f2937" />
+          </ReactFlow>
+        </div>
+      </div>
+    </div>
+  </motion.div>
+)}
         </AnimatePresence>
       </GlassCard>
 
@@ -960,7 +1232,7 @@ export default function RepositoryIntelligencePage() {
         style={{ marginLeft: 'var(--sidebar-width, 78px)' }}
         className="relative z-10 transition-all duration-300"
       >
-        <div className="mx-auto max-w-7xl px-6 py-8 md:px-8 md:py-10">
+        <div className="mx-auto max-w-7xl px-6 py-8 md:px-8 md:py-6">
           <AnimatePresence mode="wait">
             {stage === 'upload' && (
               <motion.div
@@ -969,15 +1241,19 @@ export default function RepositoryIntelligencePage() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                <div className="mb-2 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-blue-500 shadow-[0_0_30px_rgba(168,85,247,0.3)]">
                       <Layers3 className="h-5 w-5 text-white" />
                     </div>
-                    <div>
-                      <div className="text-lg font-bold tracking-tight text-white">RepoXray Intelligence Engine</div>
-                      <div className="text-sm text-neutral-500">Advanced Repository Analysis Platform</div>
-                    </div>
+                    <div className="flex flex-col leading-none">
+  <div className="text-lg font-bold text-white">
+    RepoXray Intelligence Engine
+  </div>
+  <div className="text-xs text-neutral-500 -mt-1">
+    Advanced Repository Analysis Platform
+  </div>
+</div>
                   </div>
 
                   <div className="flex flex-wrap gap-3">
