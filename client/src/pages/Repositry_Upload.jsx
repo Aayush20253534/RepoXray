@@ -21,6 +21,8 @@ import {
   X,
   Code2,
   AlignLeft,
+  Hash,
+  BadgeInfo,
 } from 'lucide-react';
 import * as Icons from "lucide-react";
 import Sidebar from '../components/sidebar';
@@ -52,6 +54,7 @@ const StatPill = ({ icon: Icon, label }) => (
     <span>{label}</span>
   </div>
 );
+
 
 const NavTabButton = ({ active, onClick, icon: Icon, label }) => (
   <button
@@ -625,6 +628,7 @@ const getInsights = (file) =>
   file.insights ||
   `This file appears to play an important role in keeping the codebase modular, readable, and scalable. Its structure suggests a clean implementation approach suitable for iterative product development.`;
 
+  
 const FilePreviewModal = ({ file, viewMode, setViewMode, onClose }) => {
   if (!file) return null;
 
@@ -778,10 +782,19 @@ const FilePreviewModal = ({ file, viewMode, setViewMode, onClose }) => {
                     className="h-[260px] overflow-auto px-5 py-4 font-mono text-sm leading-7 text-cyan-200"
                   >
                     <>
-                      <div className="mb-3 flex items-center justify-between text-xs text-neutral-500">
-                        <span>{file.name}</span>
-                        <span>{codeLines} lines</span>
-                      </div>
+               <div className="mb-4 flex items-center justify-between">
+
+  {/* File Name Card (LEFT) */}
+  <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-0.3 text-[11px] text-emerald-400">
+    {file.name}
+  </div>
+
+  {/* Lines Card (RIGHT) */}
+  <div className="rounded-3xl border border-purple-500/20 bg-purple-500/10 px-3 py-0.3 text-[11px] text-purple-300">
+    {codeLines} lines
+  </div>
+
+</div>
 
                       <code>{file.code}</code>
                     </>
