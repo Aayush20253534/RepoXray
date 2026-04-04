@@ -10,7 +10,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         {/* Default page */}
-        <Route path="/" element={<RepositoryUploadPage />} />
+        <Route path="/Repositry_Upload" element={<RepositoryUploadPage />} />
 
         {/* Profile page */}
         <Route path="/profile" element={<Profile />} />

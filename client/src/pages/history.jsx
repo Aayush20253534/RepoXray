@@ -13,29 +13,59 @@ const GlassCard = ({ children, className = "" }) => {
 
 export default function History() {
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
 
-  // 🔥 Dummy Data (later replace with backend/localStorage)
-  const historyData = [
+  // 🔥 State (so we can delete)
+  const [historyData, setHistoryData] = useState([
     {
+      id: 1,
       name: "React Repo Analyzer",
       link: "https://github.com/facebook/react",
       date: "2026-04-04 10:30 AM",
     },
     {
+      id: 2,
       name: "Node Backend Project",
       link: "https://github.com/nodejs/node",
       date: "2026-04-03 08:15 PM",
     },
     {
+      id: 3,
       name: "AI Repo Scanner",
       link: "https://github.com/openai/gpt",
       date: "2026-04-02 06:45 PM",
     },
-  ];
+  ]);
 
-  const filteredData = historyData.filter((repo) =>
-    repo.name.toLowerCase().includes(search.toLowerCase())
-  );
+  // 🧠 Convert string → Date
+  const parseDate = (dateStr) => new Date(dateStr);
+
+  const now = new Date();
+
+  // 🔍 Search + 📅 Filter
+  const filteredData = historyData.filter((repo) => {
+    const matchesSearch = repo.name.toLowerCase().includes(search.toLowerCase());
+
+    const repoDate = parseDate(repo.date);
+    let matchesFilter = true;
+
+    if (filter === "today") {
+      matchesFilter =
+        repoDate.toDateString() === now.toDateString();
+    }
+
+    if (filter === "week") {
+      const diff = (now - repoDate) / (1000 * 60 * 60 * 24);
+      matchesFilter = diff <= 7;
+    }
+
+    return matchesSearch && matchesFilter;
+  });
+
+  // 🗑 Delete Function
+  const handleDelete = (id) => {
+    setHistoryData((prev) => prev.filter((item) => item.id !== id));
+  };
 
   return (
     <div className="min-h-screen bg-[#030306] text-white flex">
@@ -54,9 +84,11 @@ export default function History() {
           </p>
         </GlassCard>
 
-        {/* 🔍 Search */}
-        <GlassCard className="mb-6">
-          <div className="flex items-center gap-3">
+        {/* 🔍 Search + 📅 Filter */}
+        <GlassCard className="mb-6 flex items-center justify-between gap-4 flex-wrap">
+          
+          {/* Search */}
+          <div className="flex items-center gap-3 flex-1 min-w-[200px]">
             <Icons.Search className="text-gray-400" />
             <input
               type="text"
@@ -66,15 +98,35 @@ export default function History() {
               className="bg-transparent outline-none w-full text-sm"
             />
           </div>
+
+          {/* Filter */}
+          <div className="flex gap-2">
+            {["all", "today", "week"].map((type) => (
+              <button
+                key={type}
+                onClick={() => setFilter(type)}
+                className={`px-3 py-1 text-xs rounded-lg transition ${
+                  filter === type
+                    ? "bg-cyan-500/30 text-cyan-300"
+                    : "bg-white/5 text-gray-400 hover:bg-white/10"
+                }`}
+              >
+                {type === "all" && "All"}
+                {type === "today" && "Today"}
+                {type === "week" && "Last 7 Days"}
+              </button>
+            ))}
+          </div>
+
         </GlassCard>
 
         {/* 📦 History List */}
         <div className="space-y-4">
 
           {filteredData.length > 0 ? (
-            filteredData.map((repo, index) => (
+            filteredData.map((repo) => (
               <motion.div
-                key={index}
+                key={repo.id}
                 whileHover={{ scale: 1.02 }}
                 className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-5 flex justify-between items-center transition"
               >
@@ -90,17 +142,28 @@ export default function History() {
                 </div>
 
                 {/* RIGHT */}
-                <div>
-  <button className="px-3 py-1 text-sm bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition">
-    View
-  </button>
-</div>
+                <div className="flex gap-2">
+                  
+                  {/* View */}
+                  <button className="px-3 py-1 text-sm bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition">
+                    View
+                  </button>
+
+                  {/* Delete */}
+                  <button
+                    onClick={() => handleDelete(repo.id)}
+                    className="px-3 py-1 text-sm bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition"
+                  >
+                    Delete
+                  </button>
+
+                </div>
               </motion.div>
             ))
           ) : (
             <GlassCard className="text-center">
               <Icons.Database className="mx-auto mb-3 text-gray-500" />
-              <p className="text-gray-400">No repositories analyzed yet</p>
+              <p className="text-gray-400">No repositories found</p>
             </GlassCard>
           )}
 
