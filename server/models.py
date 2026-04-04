@@ -10,4 +10,4 @@ class UserRepo(Base):
     username = Column(String)
     hashed_password = Column(String)
     repo_name = Column(String)
-    status = Column(String)  # repo + chat history
+    status = Column(String)  
