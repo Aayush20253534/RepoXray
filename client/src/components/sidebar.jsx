@@ -4,14 +4,10 @@ import {
   Sparkles,
   PanelLeftClose,
   PanelLeftOpen,
-  LayoutDashboard,
-  History,
-  User,
   UploadCloud,
-  LogOut,
   Search,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 
 const navItems = [
   { name: "RepositoryUpload", icon: UploadCloud, path: "/Repositry_Upload" },
@@ -24,6 +20,10 @@ const Sidebar = () => {
   });
 
   const [search, setSearch] = useState("");
+
+  // 🔥 NEW PROFILE STATES
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -64,29 +64,22 @@ const Sidebar = () => {
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
     >
       <div className="flex h-full flex-col">
-        {/* Header */}
+
+        {/* 🔷 Header */}
         <div className="relative flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 to-blue-500">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 to-blue-500">
               <Sparkles className="h-6 w-6 text-white" />
             </div>
 
-            <motion.span
-              initial={false}
-              animate={{
-                opacity: isCollapsed ? 0 : 1,
-                x: isCollapsed ? -8 : 0,
-                width: isCollapsed ? 0 : "auto",
-              }}
-              className="overflow-hidden whitespace-nowrap font-bold tracking-tight text-white"
-            >
-              RepoXray
-            </motion.span>
+            {!isCollapsed && (
+              <span className="font-bold text-white">RepoXray</span>
+            )}
           </div>
 
           <button
             onClick={() => setIsCollapsed((prev) => !prev)}
-            className="absolute -right-3 top-5 flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-[#161b2c] text-gray-300 transition hover:bg-[#1d2333] hover:text-white"
+            className="absolute -right-3 top-5 flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-[#161b2c] text-gray-300 hover:text-white"
           >
             {isCollapsed ? (
               <PanelLeftOpen size={15} />
@@ -96,7 +89,7 @@ const Sidebar = () => {
           </button>
         </div>
 
-        {/* Navigation */}
+        {/* 🔹 Navigation */}
         <nav className="space-y-1 px-3">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
@@ -112,30 +105,19 @@ const Sidebar = () => {
                     : "text-gray-400 hover:bg-white/5 hover:text-white"
                 }`}
               >
-                <div
-                  className={`flex justify-center ${
-                    isCollapsed ? "w-full" : "w-12"
-                  }`}
-                >
-                  <Icon
-                    size={20}
-                    className={
-                      isActive
-                        ? "text-cyan-400 drop-shadow-[0_0_6px_rgba(34,211,238,0.6)]"
-                        : ""
-                    }
-                  />
+                <div className={`${isCollapsed ? "w-full" : "w-12"} flex justify-center`}>
+                  <Icon size={20} />
                 </div>
 
                 {!isCollapsed && (
-                  <span className="text-sm font-medium">{item.name}</span>
+                  <span className="text-sm">{item.name}</span>
                 )}
               </button>
             );
           })}
         </nav>
 
-        {/* Search */}
+        {/* 🔍 Search */}
         {!isCollapsed && (
           <div className="mt-4 px-3">
             <div className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2">
@@ -145,34 +127,34 @@ const Sidebar = () => {
                 placeholder="Search history..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-transparent text-sm text-white outline-none placeholder-gray-500"
+                className="w-full bg-transparent text-sm text-white outline-none"
               />
             </div>
           </div>
         )}
 
-        {/* History */}
+        {/* 📜 History */}
         {!isCollapsed && (
-          <div className="no-scrollbar mt-4 flex-1 overflow-y-auto px-3">
+          <div className="mt-4 flex-1 overflow-y-auto px-3">
             <p className="mb-2 text-xs text-gray-500">History</p>
 
-            <div className="space-y-1">
-              {filteredHistory.map((item) => (
-                <button
-                  key={item.id}
-                  className="w-full truncate rounded-lg px-2 py-2 text-left text-sm text-gray-400 transition hover:bg-white/5 hover:text-white"
-                >
-                  {item.name}
-                </button>
-              ))}
-            </div>
+            {filteredHistory.map((item) => (
+              <button
+                key={item.id}
+                className="w-full truncate rounded-lg px-2 py-2 text-left text-sm text-gray-400 hover:bg-white/5 hover:text-white"
+              >
+                {item.name}
+              </button>
+            ))}
           </div>
         )}
 
-        {/* Bottom Profile */}
+        {/* 👤 PROFILE SECTION */}
         <div className="mt-auto border-t border-white/5 px-3 py-3">
+
+          {/* PROFILE BUTTON */}
           <button
-            onClick={() => navigate("/profile")}
+            onClick={() => setIsProfileOpen(!isProfileOpen)}
             className={`flex w-full items-center rounded-lg p-2 transition hover:bg-white/5 ${
               isCollapsed ? "justify-center" : "gap-3"
             }`}
@@ -184,17 +166,62 @@ const Sidebar = () => {
             {!isCollapsed && (
               <div className="text-left">
                 <p className="text-sm text-white">Om Upadhyay</p>
-                <p className="text-xs text-gray-400">View Profile</p>
+                <p className="text-xs text-gray-400">om-upadhyay</p>
               </div>
             )}
           </button>
-        </div>
-      </div>
 
-      <style>{`
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
+          {/* 🔥 EXPAND PANEL */}
+          {!isCollapsed && isProfileOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="mt-3 space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
+            >
+
+              {/* Change Password */}
+              <button
+                onClick={() => setShowPassword(!showPassword)}
+                className="w-full text-left text-sm text-gray-300 hover:text-white"
+              >
+                🔐 Change Password
+              </button>
+
+              {showPassword && (
+                <div className="space-y-2">
+                  <input
+                    type="password"
+                    placeholder="Old Password"
+                    className="w-full p-2 rounded bg-black/30 text-sm outline-none"
+                  />
+                  <input
+                    type="password"
+                    placeholder="New Password"
+                    className="w-full p-2 rounded bg-black/30 text-sm outline-none"
+                  />
+
+                  <button className="w-full py-2 text-sm bg-purple-600 rounded-lg hover:bg-purple-700">
+                    Confirm Change
+                  </button>
+                </div>
+              )}
+
+              {/* Logout */}
+              <button
+                onClick={() => {
+                  localStorage.removeItem("user");
+                  window.location.href = "/login";
+                }}
+                className="w-full text-left text-sm text-red-400 hover:text-red-300"
+              >
+                🚪 Logout
+              </button>
+
+            </motion.div>
+          )}
+        </div>
+
+      </div>
     </motion.div>
   );
 };

@@ -1,17 +1,41 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Sidebar from "./components/sidebar";
 import RepositoryUploadPage from "./pages/Repositry_Upload";
-import Profile from "./pages/profile";
-
-
+import LoginPage from "./pages/login";
 
 function App() {
+  const isAuthenticated = localStorage.getItem("user");
+
   return (
     <BrowserRouter>
       <Routes>
-        {/* Default page */}
-        <Route path="/Repositry_Upload" element={<RepositoryUploadPage />} />
-        {/* Profile page */}
-        <Route path="/profile" element={<Profile />} />
+
+        {/* 🔐 Default → Login */}
+        <Route path="/" element={<LoginPage />} />
+
+        {/* 🔐 Login */}
+        <Route path="/login" element={<LoginPage />} />
+
+        {/* 🔐 Protected App */}
+        <Route
+          path="/Repositry_Upload"
+          element={
+            isAuthenticated ? (
+              <>
+                <Sidebar />
+                <div style={{ marginLeft: "var(--sidebar-width, 220px)" }}>
+                  <RepositoryUploadPage />
+                </div>
+              </>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        {/* 🔁 Catch all */}
+        <Route path="*" element={<Navigate to="/login" />} />
+
       </Routes>
     </BrowserRouter>
   );
