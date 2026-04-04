@@ -12,11 +12,14 @@ import {
   ArrowRight,
   Cpu,
   Layers3,
-  Folder,
   FolderOpen,
   FileCode2,
-  FileText,
   FileJson,
+  Folder,
+  FileText,
+  X,
+  Code2,
+  AlignLeft,
 } from 'lucide-react';
 import Sidebar from '../components/sidebar';
 
@@ -71,7 +74,14 @@ const TREE_DATA = [
         type: 'folder',
         name: 'components',
         children: [
-          { type: 'file', name: 'Sidebar.jsx' },
+          {
+  type: 'file',
+  name: 'Sidebar.jsx',
+  summary: 'Renders the app sidebar with navigation controls and layout anchors.',
+  code: `export default function Sidebar() {
+  return <aside>Sidebar</aside>;
+}`,
+},
         ],
       },
       {
@@ -110,7 +120,7 @@ const getFileIcon = (name) => {
   return FileText;
 };
 
-const TreeNode = ({ node, depth = 0 }) => {
+const TreeNode = ({ node, depth = 0, onFileClick }) => {
   const isFolder = node.type === 'folder';
   const [isOpen, setIsOpen] = useState(depth < 1);
 
@@ -150,13 +160,14 @@ const TreeNode = ({ node, depth = 0 }) => {
               className="overflow-hidden"
             >
               <div className="relative">
-                {node.children.map((child, index) => (
-                  <TreeNode
-                    key={`${child.name}-${index}-${depth + 1}`}
-                    node={child}
-                    depth={depth + 1}
-                  />
-                ))}
+               {node.children.map((child, index) => (
+  <TreeNode
+    key={`${child.name}-${index}-${depth + 1}`}
+    node={child}
+    depth={depth + 1}
+    onFileClick={onFileClick}
+  />
+))}
               </div>
             </motion.div>
           )}
@@ -167,18 +178,20 @@ const TreeNode = ({ node, depth = 0 }) => {
 
   const FileIcon = getFileIcon(node.name);
 
-  return (
-    <div
-      className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-neutral-400 transition-all hover:bg-white/[0.03] hover:text-white"
-      style={{ paddingLeft: paddingLeft + 28 }}
-    >
-      <FileIcon className="h-4 w-4 shrink-0 text-blue-300" />
-      <span className="truncate">{node.name}</span>
-    </div>
-  );
+return (
+  <button
+    type="button"
+    onClick={() => onFileClick?.(node)}
+    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-neutral-400 transition-all hover:bg-white/[0.03] hover:text-white"
+    style={{ paddingLeft: paddingLeft + 28 }}
+  >
+    <FileIcon className="h-4 w-4 shrink-0 text-blue-300" />
+    <span className="truncate">{node.name}</span>
+  </button>
+);
 };
 
-const DirectoryExplorer = () => {
+const DirectoryExplorer = ({ onFileClick }) => {
   return (
     <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-3">
       <div className="mb-3 flex items-center gap-2 border-b border-white/5 px-2 pb-3 text-xs font-semibold uppercase tracking-[0.22em] text-neutral-500">
@@ -188,8 +201,13 @@ const DirectoryExplorer = () => {
 
       <div className="space-y-1">
         {TREE_DATA.map((node, index) => (
-          <TreeNode key={`${node.name}-${index}`} node={node} depth={0} />
-        ))}
+  <TreeNode
+    key={`${node.name}-${index}`}
+    node={node}
+    depth={0}
+    onFileClick={onFileClick}
+  />
+))}
       </div>
     </div>
   );
@@ -433,9 +451,199 @@ const LoadingBuffer = ({ onComplete }) => {
 // Stage 2B: Minimal Results Page
 // ==========================
 
+const DIRECTORY_DATA = [
+  {
+    type: 'folder',
+    name: 'src',
+    children: [
+      {
+        type: 'folder',
+        name: 'components',
+        children: [
+          {
+            type: 'file',
+            name: 'Sidebar.jsx',
+            summary: 'Renders the app sidebar with navigation controls and layout anchors.',
+            code: `export default function Sidebar() {
+  return <aside>Sidebar</aside>;
+}`,
+          },
+        ],
+      },
+      {
+        type: 'folder',
+        name: 'pages',
+        children: [
+          {
+            type: 'file',
+            name: 'RepositoryUploadPage.jsx',
+            summary: 'Handles repository URL input and starts the analysis flow.',
+            code: `export default function RepositoryUploadPage() {
+  return <div>Upload Page</div>;
+}`,
+          },
+          {
+            type: 'file',
+            name: 'RepositoryResultsPage.jsx',
+            summary: 'Displays repository analysis results using directory, summary, and dependency views.',
+            code: `export default function RepositoryResultsPage() {
+  return <div>Results Page</div>;
+}`,
+          },
+        ],
+      },
+      {
+        type: 'file',
+        name: 'App.jsx',
+        summary: 'Top-level application shell that manages page routing and layout composition.',
+        code: `function App() {
+  return <div>App</div>;
+}
+
+export default App;`,
+      },
+    ],
+  },
+  {
+    type: 'file',
+    name: 'package.json',
+    summary: 'Defines project metadata, scripts, and package dependencies.',
+    code: `{
+  "name": "repoxray"
+}`,
+  },
+];
+
+const FilePreviewModal = ({ file, viewMode, setViewMode, onClose }) => {
+  if (!file) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        key="file-modal"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 22, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 18, scale: 0.98 }}
+          transition={{ duration: 0.25 }}
+          className="relative w-full max-w-6xl overflow-hidden rounded-[30px] border border-white/10 bg-[#09090f] shadow-[0_0_60px_rgba(168,85,247,0.18)]"
+        >
+          <div className="border-b border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-6 py-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-purple-300">
+                  <FileText className="h-4 w-4" />
+                  File Preview
+                </div>
+
+                <div className="mt-2 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-xl font-bold text-white">{file.name}</h3>
+                    <p className="mt-1 truncate text-sm text-neutral-400">
+                      {file.summary}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="inline-flex rounded-xl border border-white/10 bg-black/30 p-1">
+                      <button
+                        onClick={() => setViewMode('summary')}
+                        className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+                          viewMode === 'summary'
+                            ? 'bg-white/[0.08] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
+                            : 'text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        <AlignLeft className="h-4 w-4" />
+                        Summary
+                      </button>
+
+                      <button
+                        onClick={() => setViewMode('code')}
+                        className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+                          viewMode === 'code'
+                            ? 'bg-white/[0.08] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'
+                            : 'text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        <Code2 className="h-4 w-4" />
+                        Code
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={onClose}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-neutral-300 transition hover:bg-white/[0.08] hover:text-white"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6">
+            <div className="rounded-2xl border border-white/10 bg-neutral-950/80 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-neutral-500">
+                  {viewMode === 'summary' ? 'Detailed Summary' : 'Code Preview'}
+                </div>
+
+                <div className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[11px] text-neutral-500">
+                  {viewMode === 'summary' ? 'Readable View' : 'Source View'}
+                </div>
+              </div>
+
+              <AnimatePresence mode="wait">
+                {viewMode === 'summary' ? (
+                  <motion.div
+                    key="summary-view"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    className="min-h-[420px] whitespace-pre-wrap rounded-xl border border-white/5 bg-black/30 p-5 text-sm leading-7 text-neutral-300"
+                  >
+                    {file.summary}
+                  </motion.div>
+                ) : (
+                  <motion.pre
+                    key="code-view"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    className="min-h-[420px] overflow-x-auto rounded-xl border border-white/5 bg-black/30 p-5 font-mono text-sm leading-7 text-cyan-200"
+                  >
+                    <code>{file.code}</code>
+                  </motion.pre>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
 const ResultsStage = () => {
   const [activeTab, setActiveTab] = useState('directory');
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [fileViewMode, setFileViewMode] = useState('summary');
 
+  const openFileModal = (file) => {
+  setSelectedFile(file);
+  setFileViewMode('summary');
+};
+
+const closeFileModal = () => {
+  setSelectedFile(null);
+};
   return (
     <motion.section
       initial={{ opacity: 0 }}
@@ -474,7 +682,7 @@ const ResultsStage = () => {
     animate={{ opacity: 1, y: 0 }}
     exit={{ opacity: 0, y: -14 }}
   >
-    <DirectoryExplorer />
+    <DirectoryExplorer onFileClick={openFileModal} />
   </motion.div>
 )}
           {activeTab === 'summary' && (
@@ -531,7 +739,14 @@ const ResultsStage = () => {
             </motion.div>
           )}
         </AnimatePresence>
-      </GlassCard>
+           </GlassCard>
+
+      <FilePreviewModal
+        file={selectedFile}
+        viewMode={fileViewMode}
+        setViewMode={setFileViewMode}
+        onClose={closeFileModal}
+      />
     </motion.section>
   );
 };
