@@ -1391,10 +1391,7 @@ export default function RepositoryIntelligencePage() {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:40px_40px] opacity-[0.08]" />
       </div>
 
-      <main
-        style={{ marginLeft: 'var(--sidebar-width, 78px)' }}
-        className="relative z-10 transition-all duration-300"
-      >
+      <main className="relative z-10 ml-[78px] md:ml-[220px] transition-all duration-300">
         <div className="mx-auto max-w-7xl px-6 py-8 md:px-8 md:py-6">
           <AnimatePresence mode="wait">
             {stage === 'upload' && (
