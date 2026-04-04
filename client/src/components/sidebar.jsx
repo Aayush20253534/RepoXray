@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from "react-router-dom";
 import { 
   LayoutDashboard, 
-  Github, 
+
   History, 
   User, 
   Settings, 
@@ -10,18 +11,20 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
+import * as Icons from "lucide-react";
 import { motion } from 'motion/react';
 
 const navItems = [
-  { name: 'Dashboard', icon: LayoutDashboard },
-  { name: 'RepositoryUpload', icon: Github },
-  { name: 'History', icon: History },
-  { name: 'Profile', icon: User },
+  { name: 'Dashboard', icon: LayoutDashboard, path: "/" },
+  { name: 'RepositoryUpload', icon: Icons.GitBranch, path: "/" },
+  { name: 'History', icon: History, path: "/history" },
+  { name: 'Profile', icon: User, path: "/profile" },
 ];
 
 const Sidebar = () => {
   const [activeItem, setActiveItem] = useState('Analyze');
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const navigate = useNavigate();
 
   const sidebarVariants = {
     expanded: { width: '220px' },
@@ -71,7 +74,10 @@ const Sidebar = () => {
           </div>
           
           <button 
-            onClick={() => setIsCollapsed(!isCollapsed)}
+            onClick={() => {
+  setActiveItem(item.name);
+  navigate(item.path);
+}}
             className="absolute -right-3 top-6 w-6 h-6 rounded-md bg-[#161b2c] border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:border-purple-500/50 transition-all shadow-lg z-50"
           >
             {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
@@ -84,7 +90,10 @@ const Sidebar = () => {
             return (
               <button
                 key={item.name}
-                onClick={() => setActiveItem(item.name)}
+                onClick={() => {
+  setActiveItem(item.name);
+  navigate(item.path);
+}}
                 className={`relative w-full flex items-center h-12 rounded-lg transition-all duration-200 group
                   ${isActive ? 'bg-purple-500/10 text-cyan-400' : 'text-gray-500 hover:bg-white/5 hover:text-gray-300'}
                 `}

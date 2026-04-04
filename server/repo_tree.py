@@ -2,9 +2,14 @@ import os
 import json
 import uuid
 from pathlib import Path
-from groq import Groq
 from typing import Dict, Any, List
 
+# --- LangChain & Pydantic Imports ---
+from pydantic import BaseModel, Field
+from langchain_groq import ChatGroq
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.exceptions import OutputParserException
 
 def _load_groq_api_key() -> str:
     """Load GROQ_API_KEY from environment, then fallback to local .env file."""
@@ -27,17 +32,63 @@ def _load_groq_api_key() -> str:
 
     return ""
 
-
 GROQ_API_KEY = _load_groq_api_key()
-client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
-# Directories and extensions to completely ignore to save API calls and time
+# Initialize the LangChain Groq LLM
+if GROQ_API_KEY:
+    llm = ChatGroq(
+        temperature=0.1, 
+        model_name="meta-llama/llama-4-scout-17b-16e-instruct", 
+        api_key=GROQ_API_KEY,
+        max_retries=2,
+        model_kwargs={"response_format": {"type": "json_object"}}
+    )
+else:
+    llm = None
+
+# Directories and extensions to completely ignore
 IGNORE_DIRS = {".git", "node_modules", "venv", "__pycache__", ".next", "dist", "build", "coverage"}
 IGNORE_EXTS = {".jpg", ".png", ".gif", ".mp4", ".ico", ".svg", ".zip", ".tar", ".gz", ".pdf", ".lock"}
 MAX_FILE_SIZE_BYTES = 50000  # Skip or truncate files larger than ~50KB
 
+# --- LangChain Schema Definition ---
+class FileAnalysis(BaseModel):
+    purpose: str = Field(description="A brief 1-2 sentence description of what this file does.")
+    libraries_used: List[str] = Field(description="Array of strings representing main imports/dependencies.")
+    coding_pattern: str = Field(description="String (e.g., 'React Component', 'FastAPI Router', 'Utility function', 'Singleton').")
+    project_role: str = Field(description="String ('frontend', 'backend', 'database', 'config', 'docs', or 'other').")
+    key_functions: List[str] = Field(description="Array of strings representing names of the main functions or classes defined here.")
+
+# Set up the parser based on our Pydantic schema
+parser = JsonOutputParser(pydantic_object=FileAnalysis)
+
+# Define the LangChain prompt
+prompt_template = PromptTemplate(
+    template="""
+    You are an automated, strict JSON-only API. You do not converse, you do not explain, and you do not use markdown code blocks (like ```json).
+    
+    Analyze the following file named '{filename}'. 
+    
+    If the file is documentation (like README.md, .txt, or config files), summarize its purpose in the "purpose" field, set "project_role" to "docs" or "config", and return empty arrays/Unknown for the code-specific fields.
+
+    File Content:
+    {file_content}
+    
+    CRITICAL INSTRUCTION: Your entire response MUST be exactly one valid JSON object. Do not output anything before or after the JSON.
+    
+    {format_instructions}
+    """,
+    input_variables=["filename", "file_content"],
+    partial_variables={"format_instructions": parser.get_format_instructions()},
+)
+
+# Create the LCEL (LangChain Expression Language) Chain
+if llm:
+    analysis_chain = prompt_template | llm | parser
+else:
+    analysis_chain = None
+
 def is_text_file(filepath: Path) -> bool:
-    """Basic check to ensure we don't try to read binary files."""
     if filepath.suffix.lower() in IGNORE_EXTS:
         return False
     try:
@@ -48,20 +99,20 @@ def is_text_file(filepath: Path) -> bool:
         return False
 
 def get_file_language(extension: str) -> str:
-    """Fallback logic for language mapping."""
     ext_map = {
         ".py": "Python", ".js": "JavaScript", ".ts": "TypeScript",
         ".jsx": "React/JS", ".tsx": "React/TS", ".go": "Go",
         ".rs": "Rust", ".java": "Java", ".cpp": "C++", ".c": "C",
-        ".html": "HTML", ".css": "CSS", ".md": "Markdown", ".sql": "SQL"
+        ".html": "HTML", ".css": "CSS", ".md": "Markdown", ".sql": "SQL",
+        ".json": "JSON"
     }
     return ext_map.get(extension.lower(), "Unknown")
 
 def ask_groq_for_xray(file_content: str, filename: str) -> Dict[str, Any]:
     """
-    Calls the Groq API to analyze the file content and return structured JSON.
+    Calls the Groq API via LangChain to analyze the file content.
     """
-    if client is None:
+    if analysis_chain is None:
         return {
             "purpose": "Groq API key not configured. Analysis skipped.",
             "libraries_used": [],
@@ -70,76 +121,52 @@ def ask_groq_for_xray(file_content: str, filename: str) -> Dict[str, Any]:
             "key_functions": []
         }
 
-    # Truncate content to avoid blowing up context windows
     if len(file_content) > 15000:
         file_content = file_content[:15000] + "\n...[TRUNCATED FOR SIZE]"
 
-    prompt = f"""
-    Analyze the following code file named '{filename}'.
-    Return ONLY a valid JSON object with the following keys:
-    - "purpose": A brief 1-2 sentence description of what this file does.
-    - "libraries_used": Array of strings (main imports/dependencies).
-    - "coding_pattern": String (e.g., "React Component", "FastAPI Router", "Utility function", "Singleton").
-    - "project_role": String ("frontend", "backend", "database", "config", "docs", or "other").
-    - "key_functions": Array of strings (names of the main functions or classes defined here).
-
-    Code:
-    ```
-    {file_content}
-    ```
-    """
-
     try:
-        # Using llama3-8b-8192 as it is incredibly fast and cheap for simple parsing
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "You are a code analysis bot. Output strictly valid JSON without markdown wrapping."},
-                {"role": "user", "content": prompt}
-            ],
-            model="llama3-8b-8192", 
-            response_format={"type": "json_object"},
-            temperature=0.1,
-        )
-        
-        response_text = chat_completion.choices[0].message.content
-        return json.loads(response_text)
+        # Invoke the LangChain pipeline
+        result = analysis_chain.invoke({
+            "filename": filename,
+            "file_content": file_content
+        })
+        return result
     
+    except OutputParserException as e:
+        print(f"[XRAY ERROR] LangChain parsing failed for {filename}: {e}")
+        return {
+            "purpose": "LLM failed to return valid JSON schema",
+            "libraries_used": [],
+            "coding_pattern": "Unknown",
+            "project_role": "Unknown",
+            "key_functions": []
+        }
     except Exception as e:
         print(f"[XRAY ERROR] Groq API failed for {filename}: {e}")
         return {
-            "purpose": "Analysis failed or skipped",
+            "purpose": f"Analysis failed: {str(e)}",
             "libraries_used": [],
             "coding_pattern": "Unknown",
             "project_role": "Unknown",
             "key_functions": []
         }
 
-def analyze_file(filepath: Path, base_path: Path) -> Dict[str, Any]:
+def analyze_file(filepath: Path) -> Dict[str, Any]:
     """Extracts local metadata and fetches LLM metadata for a single file."""
-    relative_path = filepath.relative_to(base_path)
-    
-    # 1. Local Meta Data
     metadata = {
         "file_name": filepath.name,
-        "path": str(relative_path),
-        "parent_folder": filepath.parent.name if filepath.parent != base_path else "root",
         "extension": filepath.suffix,
         "language": get_file_language(filepath.suffix),
         "size_bytes": filepath.stat().st_size
     }
 
-    # 2. LLM Meta Data (Only if it's a manageable text file)
     if is_text_file(filepath) and metadata["size_bytes"] < MAX_FILE_SIZE_BYTES:
         with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
             
-        print(f"  -> X-Raying: {relative_path}")
         llm_data = ask_groq_for_xray(content, filepath.name)
-        
-        # Merge LLM data into our metadata dictionary
         metadata.update(llm_data)
     else:
-        # Fallback for big files or binaries
         metadata.update({
             "purpose": "Binary or overly large file.",
             "libraries_used": [],
@@ -148,19 +175,11 @@ def analyze_file(filepath: Path, base_path: Path) -> Dict[str, Any]:
             "key_functions": []
         })
 
-    return {"type": "file", "metadata": metadata}
+    return metadata
 
-def generate_repo_tree(current_path: Path, base_path: Path) -> Dict[str, Any]:
-    """Recursively walks the directory and builds the tree structure."""
-    tree = {
-        "type": "directory",
-        "name": current_path.name,
-        "path": str(current_path.relative_to(base_path)) if current_path != base_path else "root",
-        "children": []
-    }
-
+def generate_flat_repo_map(current_path: Path, base_path: Path, repo_map: Dict[str, Any]) -> None:
+    """Recursively walks the directory and builds a flat map of files."""
     try:
-        # Sort items so directories come first, then files
         items = sorted(current_path.iterdir(), key=lambda x: (x.is_file(), x.name))
         
         for item in items:
@@ -168,17 +187,17 @@ def generate_repo_tree(current_path: Path, base_path: Path) -> Dict[str, Any]:
                 continue
                 
             if item.is_dir():
-                tree["children"].append(generate_repo_tree(item, base_path))
+                generate_flat_repo_map(item, base_path, repo_map)
             elif item.is_file():
-                tree["children"].append(analyze_file(item, base_path))
+                relative_path_key = item.relative_to(base_path).as_posix()
+                print(f"  -> X-Raying: {relative_path_key}")
+                repo_map[relative_path_key] = analyze_file(item)
                 
     except PermissionError:
-        pass # Skip folders we don't have access to
-        
-    return tree
+        pass
 
-def run_repo_xray(repo_id: str, clone_path_str: str, output_dir: str = "./xray_results"):
-    """Main entry point to scan the repo and save the JSON file."""
+def run_repo_xray(repo_id: str, clone_path_str: str, output_dir: str = "./Repo_Codes_data"):
+    """Main entry point to scan the repo and save the flat JSON map."""
     clone_path = Path(clone_path_str)
     
     if not clone_path.exists():
@@ -189,19 +208,16 @@ def run_repo_xray(repo_id: str, clone_path_str: str, output_dir: str = "./xray_r
 
     print(f"\n[STARTING X-RAY] Scanning repository: {repo_id}")
     
-    # Generate the complete tree
-    repo_tree = generate_repo_tree(clone_path, clone_path)
+    flat_repo_map = {}
+    generate_flat_repo_map(clone_path, clone_path, flat_repo_map)
     
-    # Save to unique JSON file
     with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(repo_tree, f, indent=4)
+        json.dump(flat_repo_map, f, indent=4)
         
     print(f"[X-RAY COMPLETE] Results saved to: {output_file}")
     return str(output_file)
 
-# --- For isolated testing ---
 if __name__ == "__main__":
-    # Test it by pointing it at its own project directory!
     dummy_repo_id = str(uuid.uuid4())
     test_path = os.path.dirname(os.path.abspath(__file__)) 
     run_repo_xray(dummy_repo_id, test_path)
