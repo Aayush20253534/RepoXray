@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import React, { useState, useEffect, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Sparkles,
   PanelLeftClose,
@@ -20,12 +20,9 @@ const Sidebar = () => {
   });
 
   const [search, setSearch] = useState("");
-
-  // 🔥 NEW PROFILE STATES
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
@@ -55,6 +52,32 @@ const Sidebar = () => {
     collapsed: { width: "78px" },
   };
 
+  const storedUser = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("user");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const profileName =
+    storedUser?.name ||
+    storedUser?.username ||
+    "User";
+
+  const profileUsername =
+    storedUser?.username ||
+    "user";
+
+  const profileInitial = profileName?.charAt(0)?.toUpperCase() || "U";
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    window.location.href = "/";
+  };
+
   return (
     <motion.div
       className="fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-white/5 bg-[#080b14] shadow-2xl"
@@ -64,8 +87,7 @@ const Sidebar = () => {
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
     >
       <div className="flex h-full flex-col">
-
-        {/* 🔷 Header */}
+        {/* Header */}
         <div className="relative flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 to-blue-500">
@@ -89,7 +111,7 @@ const Sidebar = () => {
           </button>
         </div>
 
-        {/* 🔹 Navigation */}
+        {/* Navigation */}
         <nav className="space-y-1 px-3">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
@@ -98,16 +120,20 @@ const Sidebar = () => {
             return (
               <button
                 key={item.name}
-   onClick={() => {
-  window.location.href = item.path;
-}}
+                onClick={() => {
+                  window.location.href = item.path;
+                }}
                 className={`flex h-12 w-full items-center rounded-lg transition ${
                   isActive
                     ? "bg-purple-500/10 text-cyan-400"
                     : "text-gray-400 hover:bg-white/5 hover:text-white"
                 }`}
               >
-                <div className={`${isCollapsed ? "w-full" : "w-12"} flex justify-center`}>
+                <div
+                  className={`${
+                    isCollapsed ? "w-full" : "w-12"
+                  } flex justify-center`}
+                >
                   <Icon size={20} />
                 </div>
 
@@ -119,7 +145,7 @@ const Sidebar = () => {
           })}
         </nav>
 
-        {/* 🔍 Search */}
+        {/* Search */}
         {!isCollapsed && (
           <div className="mt-4 px-3">
             <div className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2">
@@ -135,7 +161,7 @@ const Sidebar = () => {
           </div>
         )}
 
-        {/* 📜 History */}
+        {/* History */}
         {!isCollapsed && (
           <div className="mt-4 flex-1 overflow-y-auto px-3">
             <p className="mb-2 text-xs text-gray-500">History</p>
@@ -151,10 +177,8 @@ const Sidebar = () => {
           </div>
         )}
 
-        {/* 👤 PROFILE SECTION */}
+        {/* Profile Section */}
         <div className="mt-auto border-t border-white/5 px-3 py-3">
-
-          {/* PROFILE BUTTON */}
           <button
             onClick={() => setIsProfileOpen(!isProfileOpen)}
             className={`flex w-full items-center rounded-lg p-2 transition hover:bg-white/5 ${
@@ -162,26 +186,25 @@ const Sidebar = () => {
             }`}
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-500 text-white">
-              O
+              {profileInitial}
             </div>
 
             {!isCollapsed && (
-              <div className="text-left">
-                <p className="text-sm text-white">Om Upadhyay</p>
-                <p className="text-xs text-gray-400">om-upadhyay</p>
+              <div className="text-left min-w-0">
+                <p className="truncate text-sm text-white">{profileName}</p>
+                <p className="truncate text-xs text-gray-400">
+                  {profileUsername}
+                </p>
               </div>
             )}
           </button>
 
-          {/* 🔥 EXPAND PANEL */}
           {!isCollapsed && isProfileOpen && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               className="mt-3 space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
             >
-
-              {/* Change Password */}
               <button
                 onClick={() => setShowPassword(!showPassword)}
                 className="w-full text-left text-sm text-gray-300 hover:text-white"
@@ -194,35 +217,29 @@ const Sidebar = () => {
                   <input
                     type="password"
                     placeholder="Old Password"
-                    className="w-full p-2 rounded bg-black/30 text-sm outline-none"
+                    className="w-full rounded bg-black/30 p-2 text-sm outline-none"
                   />
                   <input
                     type="password"
                     placeholder="New Password"
-                    className="w-full p-2 rounded bg-black/30 text-sm outline-none"
+                    className="w-full rounded bg-black/30 p-2 text-sm outline-none"
                   />
 
-                  <button className="w-full py-2 text-sm bg-purple-600 rounded-lg hover:bg-purple-700">
+                  <button className="w-full rounded-lg bg-purple-600 py-2 text-sm hover:bg-purple-700">
                     Confirm Change
                   </button>
                 </div>
               )}
 
-              {/* Logout */}
               <button
-                onClick={() => {
-                  localStorage.removeItem("user");
-                  window.location.href = "/login";
-                }}
+                onClick={handleLogout}
                 className="w-full text-left text-sm text-red-400 hover:text-red-300"
               >
                 🚪 Logout
               </button>
-
             </motion.div>
           )}
         </div>
-
       </div>
     </motion.div>
   );
