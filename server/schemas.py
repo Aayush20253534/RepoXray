@@ -23,3 +23,7 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str = Field(..., min_length=8, description="Password must be at least 8 characters long")
