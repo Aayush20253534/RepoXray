@@ -94,7 +94,8 @@ async def ingest_repository(
         "repo_id": repo_id,
         "websocket_endpoint": f"ws://localhost:8000/api/ws/status/{repo_id}",
         "tree_endpoint": f"/api/tree/{repo_id}",
-        "graph_endpoint": f"/api/graph/{repo_id}" 
+        "graph_endpoint": f"/api/graph/{repo_id}",
+        "summary_endpoint": f"/api/summary/{repo_id}"  # <-- ADDED
     }
 
 # --- REAL-TIME WEBSOCKET STATUS TRACKER ---
@@ -189,6 +190,32 @@ async def get_repo_graph(
             return json.load(f)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading graph data: {str(e)}")
+
+# --- ENDPOINT 3: THE ARCHITECTURAL SUMMARY ---
+@app.get("/api/summary/{repo_id}")
+async def get_repo_summary(
+    repo_id: str,
+    current_user: models.User = Depends(get_current_user)
+):
+    status_info = get_repo_status(repo_id, current_user.id)
+    if status_info.get("status") == "not_found":
+        raise HTTPException(status_code=404, detail="Repository not found or unauthorized.")
+    
+    if status_info.get("status") != "success":
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Summary data not ready yet. Current status: {status_info.get('status')}"
+        )
+
+    file_path = os.path.join("Repo_Codes_data", f"{repo_id}_summary.json")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=500, detail="Summary JSON file is missing from the server.")
+        
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading summary data: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
