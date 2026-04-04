@@ -5,8 +5,31 @@ from pathlib import Path
 from groq import Groq
 from typing import Dict, Any, List
 
-# TODO: Set your GROQ_API_KEY in your environment variables
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+def _load_groq_api_key() -> str:
+    """Load GROQ_API_KEY from environment, then fallback to local .env file."""
+    env_key = os.environ.get("GROQ_API_KEY")
+    if env_key:
+        return env_key.strip()
+
+    env_file = Path(__file__).resolve().parent / ".env"
+    if not env_file.exists():
+        return ""
+
+    for line in env_file.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        if key.strip() == "GROQ_API_KEY":
+            return value.strip().strip('"').strip("'")
+
+    return ""
+
+
+GROQ_API_KEY = _load_groq_api_key()
+client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 # Directories and extensions to completely ignore to save API calls and time
 IGNORE_DIRS = {".git", "node_modules", "venv", "__pycache__", ".next", "dist", "build", "coverage"}
@@ -38,6 +61,15 @@ def ask_groq_for_xray(file_content: str, filename: str) -> Dict[str, Any]:
     """
     Calls the Groq API to analyze the file content and return structured JSON.
     """
+    if client is None:
+        return {
+            "purpose": "Groq API key not configured. Analysis skipped.",
+            "libraries_used": [],
+            "coding_pattern": "Unknown",
+            "project_role": "Unknown",
+            "key_functions": []
+        }
+
     # Truncate content to avoid blowing up context windows
     if len(file_content) > 15000:
         file_content = file_content[:15000] + "\n...[TRUNCATED FOR SIZE]"

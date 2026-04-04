@@ -8,7 +8,7 @@ from database import SessionLocal
 from models import Repository  # Importing the new unified table
 
 # Import the X-ray function we created earlier
-from RepoXray import run_repo_xray 
+from repo_tree import run_repo_xray 
 
 # Base directory where cloned repos will be stored
 REPOS_BASE_DIR = os.path.join(os.path.dirname(__file__), "cloned_repos")
