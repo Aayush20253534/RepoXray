@@ -81,147 +81,346 @@ const NavTabButton = ({ active, onClick, icon: Icon, label }) => (
   </button>
 );
 
-const TREE_DATA = [
-  {
-    type: 'folder',
-    name: 'src',
-    children: [
-      {
-        type: 'folder',
-        name: 'components',
-        children: [
-          {
-            type: 'file',
-            name: 'Sidebar.jsx',
-            summary: 'Renders the app sidebar with navigation controls and layout anchors.',
-            overview:
-              'Sidebar.jsx defines the persistent navigation shell for the product and acts as the entry point for section-level movement across the interface.',
-            responsibilities: [
-              'Renders the sidebar navigation container and menu links',
-              'Supports layout anchoring for the main application shell',
-              'Improves navigation consistency across pages and views',
-            ],
-            insights:
-              'This file is foundational for interface structure because it stabilizes navigation behavior and keeps the overall experience modular and reusable.',
-            code: `export default function Sidebar() {
-  return <aside>Sidebar</aside>;
-}`,
-          },
-        ],
+const buildDirectoryTreeFromFlatMap = (flatMap) => {
+  if (!flatMap || typeof flatMap !== "object") return [];
+
+  const root = [];
+
+  const sortNodes = (nodes) => {
+    nodes.sort((a, b) => {
+      if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    nodes.forEach((node) => {
+      if (node.type === "folder" && Array.isArray(node.children)) {
+        sortNodes(node.children);
+      }
+    });
+  };
+
+  Object.entries(flatMap).forEach(([filePath, meta]) => {
+    const parts = filePath.split("/").filter(Boolean);
+    let currentLevel = root;
+
+    parts.forEach((part, index) => {
+      const isLast = index === parts.length - 1;
+
+      if (isLast) {
+        currentLevel.push({
+          type: "file",
+          name: part,
+          fullPath: filePath,
+          summary: meta?.purpose || "No summary available.",
+          overview: meta?.purpose || "No overview available.",
+          responsibilities:
+            meta?.key_functions?.length > 0
+              ? meta.key_functions.map((fn) => `Contains or exposes: ${fn}`)
+              : [
+                  `Language: ${meta?.language || "Unknown"}`,
+                  `Pattern: ${meta?.coding_pattern || "Unknown"}`
+                ],
+          insights: `Role: ${meta?.project_role || "other"} • Libraries: ${
+            meta?.libraries_used?.length ? meta.libraries_used.join(", ") : "None detected"
+          }`,
+          code: "",
+          metadata: meta,
+        });
+      } else {
+        let existingFolder = currentLevel.find(
+          (node) => node.type === "folder" && node.name === part
+        );
+
+        if (!existingFolder) {
+          existingFolder = {
+            type: "folder",
+            name: part,
+            children: [],
+          };
+          currentLevel.push(existingFolder);
+        }
+
+        currentLevel = existingFolder.children;
+      }
+    });
+  });
+
+  sortNodes(root);
+  return root;
+};
+
+const getGraphNodeTypeLabel = (meta = {}) => {
+  const role = (meta.project_role || "").toLowerCase();
+  const language = (meta.language || "").toLowerCase();
+  const ext = (meta.extension || "").toLowerCase();
+
+  if (role === "frontend") return "Frontend";
+  if (role === "backend") return "Backend";
+  if (role === "database") return "Database";
+  if (role === "config") return "Config";
+  if (role === "docs") return "Docs";
+
+  if ([".jsx", ".tsx", ".js", ".ts", ".css", ".html"].includes(ext)) return "Frontend";
+  if ([".py", ".java", ".go", ".rs", ".php"].includes(ext)) return "Backend";
+  if ([".json", ".yaml", ".yml", ".toml", ".env"].includes(ext)) return "Config";
+  if (language.includes("markdown")) return "Docs";
+
+  return "Module";
+};
+
+const getGraphNodeIconConfig = (meta = {}) => {
+  const role = (meta.project_role || "").toLowerCase();
+  const ext = (meta.extension || "").toLowerCase();
+
+  // 🟠 FRONTEND
+  if (role === "frontend" || [".jsx", ".tsx", ".js", ".ts", ".css", ".html"].includes(ext)) {
+    return {
+      icon: Layers3,
+      iconWrapClass: 'border-orange-500/25 bg-orange-500/12',
+      iconClass: 'text-orange-300',
+    };
+  }
+
+  // 🔵 BACKEND
+  if (role === "backend" || [".py", ".java", ".go", ".rs", ".php"].includes(ext)) {
+    return {
+      icon: Cpu,
+      iconWrapClass: 'border-blue-500/25 bg-blue-500/12',
+      iconClass: 'text-blue-300',
+    };
+  }
+
+  // 🟢 EVERYTHING ELSE (config + db + docs + unknown)
+  return {
+    icon: FileJson,
+    iconWrapClass: 'border-emerald-500/25 bg-emerald-500/12',
+    iconClass: 'text-emerald-300',
+  };
+};
+const buildReactFlowGraphFromBackend = (graphData) => {
+  if (!graphData || typeof graphData !== "object") {
+    return { nodes: [], edges: [] };
+  }
+
+  const backendNodes = graphData.nodes || {};
+  const backendEdges = Array.isArray(graphData.edges) ? graphData.edges : [];
+  const filePaths = Object.keys(backendNodes);
+
+  if (filePaths.length === 0) {
+    return { nodes: [], edges: [] };
+  }
+
+  const incomingCount = {};
+  const outgoingMap = {};
+  const connectedSet = new Set();
+
+  filePaths.forEach((path) => {
+    incomingCount[path] = 0;
+    outgoingMap[path] = [];
+  });
+
+  backendEdges.forEach((edge) => {
+    if (!edge?.source || !edge?.target) return;
+    if (!backendNodes[edge.source] || !backendNodes[edge.target]) return;
+
+    outgoingMap[edge.source].push(edge.target);
+    incomingCount[edge.target] = (incomingCount[edge.target] || 0) + 1;
+
+    connectedSet.add(edge.source);
+    connectedSet.add(edge.target);
+  });
+
+  const rootCandidates = filePaths.filter(
+    (path) => connectedSet.has(path) && (incomingCount[path] || 0) === 0
+  );
+
+  const connectedNodes = filePaths.filter((path) => connectedSet.has(path));
+  const isolatedNodes = filePaths.filter((path) => !connectedSet.has(path));
+
+  const visited = new Set();
+  const levelMap = {};
+  const subtreeWidthMap = {};
+
+  const computeSubtreeWidth = (nodeId) => {
+    if (subtreeWidthMap[nodeId]) return subtreeWidthMap[nodeId];
+
+    const children = outgoingMap[nodeId] || [];
+    const validChildren = children.filter((child) => !visited.has(child));
+
+    if (validChildren.length === 0) {
+      subtreeWidthMap[nodeId] = 1;
+      return 1;
+    }
+
+    let total = 0;
+
+    validChildren.forEach((child) => {
+      visited.add(child);
+      total += computeSubtreeWidth(child);
+    });
+
+    subtreeWidthMap[nodeId] = Math.max(total, 1);
+    return subtreeWidthMap[nodeId];
+  };
+
+  rootCandidates.forEach((root) => {
+    if (!visited.has(root)) {
+      visited.add(root);
+      computeSubtreeWidth(root);
+    }
+  });
+
+  const remainingConnected = connectedNodes.filter((node) => !subtreeWidthMap[node]);
+  remainingConnected.forEach((node) => {
+    subtreeWidthMap[node] = 1;
+  });
+
+  const positionedNodes = [];
+  const placedIds = new Set();
+
+  const xUnit = 180;
+  const yUnit = 130;
+  const startX = 120;
+  const startY = 80;
+
+  const placeTree = (nodeId, centerX, level) => {
+    if (placedIds.has(nodeId)) return;
+    placedIds.add(nodeId);
+    levelMap[nodeId] = level;
+
+    const meta = backendNodes[nodeId] || {};
+    const fileName = nodeId.split("/").pop();
+    const iconConfig = getGraphNodeIconConfig(meta);
+
+    positionedNodes.push({
+      id: nodeId,
+      type: "dependencyNode",
+      position: {
+        x: centerX,
+        y: startY + level * yUnit,
       },
-      {
-        type: 'folder',
-        name: 'pages',
-        children: [
-          {
-            type: 'file',
-            name: 'RepositoryUploadPage.jsx',
-            summary: 'Handles repository URL input and starts the analysis flow.',
-            overview:
-              'RepositoryUploadPage.jsx is responsible for collecting the repository link, validating the user action, and initiating the analysis pipeline.',
-            responsibilities: [
-              'Accepts and validates repository URL input',
-              'Triggers the analysis flow and loading stage',
-              'Provides a clean launch point for repository scanning',
-            ],
-            insights:
-              'This page is conversion-critical because it transforms a simple link input into the product’s full repository intelligence experience.',
-            code: `export default function RepositoryUploadPage() {
-  return <div>Upload Page</div>;
-}`,
-          },
-          {
-            type: 'file',
-            name: 'RepositoryResultsPage.jsx',
-            summary: 'Displays repository analysis results using directory, summary, and dependency views.',
-            overview:
-              'RepositoryResultsPage.jsx organizes the post-analysis experience and surfaces the main intelligence outputs through a tab-based interface.',
-            responsibilities: [
-              'Displays repository insights across structured tabs',
-              'Connects directory tree, summaries, and dependency data',
-              'Provides an exploration surface for the analyzed repository',
-            ],
-            insights:
-              'This file acts as the insight dashboard layer, turning raw repository data into something visual, readable, and product-friendly.',
-            code: `export default function RepositoryResultsPage() {
-  return <div>Results Page</div>;
-}`,
-          },
-        ],
+      data: {
+        label: fileName,
+        fullPath: nodeId,
+        fileType: getGraphNodeTypeLabel(meta),
+        ...iconConfig,
       },
-      {
-        type: 'folder',
-        name: 'hooks',
-        children: [],
+      selected: false,
+    });
+
+    const children = (outgoingMap[nodeId] || []).filter((child) => !placedIds.has(child));
+    if (children.length === 0) return;
+
+    const totalWidth = children.reduce(
+      (sum, child) => sum + (subtreeWidthMap[child] || 1),
+      0
+    );
+
+    let cursorX = centerX - ((totalWidth - 1) * xUnit) / 2;
+
+    children.forEach((child) => {
+      const childWidth = subtreeWidthMap[child] || 1;
+      const childCenterX = cursorX + ((childWidth - 1) * xUnit) / 2;
+      placeTree(child, childCenterX, level + 1);
+      cursorX += childWidth * xUnit;
+    });
+  };
+
+  let forestCursorX = startX;
+
+  rootCandidates.forEach((root) => {
+    if (placedIds.has(root)) return;
+
+    const widthUnits = subtreeWidthMap[root] || 1;
+    const rootCenterX = forestCursorX + ((widthUnits - 1) * xUnit) / 2;
+    placeTree(root, rootCenterX, 0);
+    forestCursorX += widthUnits * xUnit + 140;
+  });
+
+  const unplacedConnected = connectedNodes.filter((node) => !placedIds.has(node));
+  if (unplacedConnected.length > 0) {
+    let extraX = forestCursorX;
+
+    unplacedConnected.forEach((node, index) => {
+      const meta = backendNodes[node] || {};
+      const fileName = node.split("/").pop();
+      const iconConfig = getGraphNodeIconConfig(meta);
+
+      positionedNodes.push({
+        id: node,
+        type: "dependencyNode",
+        position: {
+          x: extraX,
+          y: startY + (index % 3) * yUnit,
+        },
+        data: {
+          label: fileName,
+          fullPath: node,
+          fileType: getGraphNodeTypeLabel(meta),
+          ...iconConfig,
+        },
+        selected: false,
+      });
+
+      extraX += xUnit;
+    });
+
+    forestCursorX = extraX + 100;
+  }
+
+  if (isolatedNodes.length > 0) {
+  const connectedBottomY =
+    positionedNodes.length > 0
+      ? Math.max(...positionedNodes.map((node) => node.position.y))
+      : startY;
+
+  const isolatedBaseY = connectedBottomY + 220;
+  const isolatedCols = Math.min(4, Math.max(2, isolatedNodes.length));
+  const isolatedXStart = startX + 40;
+
+  isolatedNodes.forEach((nodeId, index) => {
+    const meta = backendNodes[nodeId] || {};
+    const fileName = nodeId.split("/").pop();
+    const iconConfig = getGraphNodeIconConfig(meta);
+
+    const col = index % isolatedCols;
+    const row = Math.floor(index / isolatedCols);
+
+    positionedNodes.push({
+      id: nodeId,
+      type: "dependencyNode",
+      position: {
+        x: isolatedXStart + col * 240,
+        y: isolatedBaseY + row * 150,
       },
-      {
-        type: 'folder',
-        name: 'utils',
-        children: [],
+      data: {
+        label: fileName,
+        fullPath: nodeId,
+        fileType: `${getGraphNodeTypeLabel(meta)} • Isolated`,
+        ...iconConfig,
       },
-      {
-        type: 'file',
-        name: 'App.jsx',
-        summary: 'Top-level application shell that manages page routing and layout composition.',
-        overview:
-          'App.jsx defines the root interface composition and determines how the major pages and shared layout elements are stitched together.',
-        responsibilities: [
-          'Acts as the top-level application wrapper',
-          'Coordinates routing and page-level rendering',
-          'Maintains global layout structure and composition',
-        ],
-        insights:
-          'This is the architectural control point of the frontend, making it one of the most important files for maintainability and scalability.',
-        code: `function App() {
-  return <div>App</div>;
+      selected: false,
+    });
+  });
 }
-
-export default App;`,
+  const edges = backendEdges
+    .filter((edge) => backendNodes[edge.source] && backendNodes[edge.target])
+    .map((edge, index) => ({
+      id: `edge-${index}-${edge.source}-${edge.target}`,
+      source: edge.source,
+      target: edge.target,
+      type: "smoothstep",
+      animated: true,
+      markerEnd: { type: MarkerType.ArrowClosed },
+      style: {
+        stroke: "#8b5cf6",
+        strokeWidth: 2.2,
+        strokeDasharray: "7 7",
       },
-    ],
-  },
-  {
-    type: 'folder',
-    name: 'public',
-    children: [],
-  },
-  {
-    type: 'file',
-    name: 'package.json',
-    summary: 'Defines project metadata, scripts, and package dependencies.',
-    overview:
-      'package.json contains the project identity, execution scripts, and dependency contract required to run and build the application.',
-    responsibilities: [
-      'Declares project metadata and package identity',
-      'Defines scripts for development and build workflows',
-      'Tracks dependency versions required by the application',
-    ],
-    insights:
-      'This file is the dependency backbone of the project and directly affects reproducibility, tooling, and environment consistency.',
-    code: `{
-  "name": "repoxray"
-}`,
-  },
-  {
-    type: 'file',
-    name: 'vite.config.js',
-    summary: 'Configures the Vite build system and frontend tooling pipeline.',
-    overview:
-      'vite.config.js shapes how the frontend dev server, bundling, and environment behavior are configured during development and production.',
-    responsibilities: [
-      'Configures the Vite toolchain and plugins',
-      'Supports build-time and development-time behavior',
-      'Improves frontend performance and project setup clarity',
-    ],
-    insights:
-      'Though usually small, this file has high leverage because it influences how the entire frontend compiles, serves, and scales.',
-    code: `import { defineConfig } from 'vite';
+    }));
 
-export default defineConfig({
-  plugins: [],
-});`,
-  },
-];
+  return { nodes: positionedNodes, edges };
+};
 
 const getFileIcon = (name) => {
   if (name.endsWith('.json')) return FileJson;
@@ -300,7 +499,7 @@ const TreeNode = ({ node, depth = 0, onFileClick }) => {
   );
 };
 
-const DirectoryExplorer = ({ onFileClick }) => {
+const DirectoryExplorer = ({ treeData = [], onFileClick }) => {
   return (
     <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-3">
       <div className="mb-3 flex items-center gap-2 border-b border-white/5 px-2 pb-3 text-xs font-semibold uppercase tracking-[0.22em] text-neutral-500">
@@ -309,14 +508,20 @@ const DirectoryExplorer = ({ onFileClick }) => {
       </div>
 
       <div className="space-y-1">
-        {TREE_DATA.map((node, index) => (
-          <TreeNode
-            key={`${node.name}-${index}`}
-            node={node}
-            depth={0}
-            onFileClick={onFileClick}
-          />
-        ))}
+        {treeData.length > 0 ? (
+          treeData.map((node, index) => (
+            <TreeNode
+              key={`${node.name}-${index}`}
+              node={node}
+              depth={0}
+              onFileClick={onFileClick}
+            />
+          ))
+        ) : (
+          <div className="px-3 py-6 text-sm text-neutral-500">
+            No directory data available.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1278,7 +1483,7 @@ const dependencyEdgesData = [
     },
   },
 ];
-const ResultsStage = () => {
+const ResultsStage = ({ repoTreeData = [], repoGraphData = { nodes: [], edges: [] } }) => {
   const [activeTab, setActiveTab] = useState('directory');
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileViewMode, setFileViewMode] = useState('summary');
@@ -1286,14 +1491,14 @@ const ResultsStage = () => {
 
 const initialNodes = useMemo(
   () =>
-    dependencyNodesData.map((node) => ({
+    (repoGraphData?.nodes || []).map((node) => ({
       ...node,
       selected: false,
     })),
-  []
+  [repoGraphData]
 );
 
-const initialEdges = useMemo(() => dependencyEdgesData, []);
+const initialEdges = useMemo(() => repoGraphData?.edges || [], [repoGraphData]);
 
 const [flowNodes, setFlowNodes, onNodesChange] = useNodesState(initialNodes);
 const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -1307,19 +1512,29 @@ useEffect(() => {
   );
 }, [selectedDependencyNode, setFlowNodes]);
 
+useEffect(() => {
+  setFlowNodes(
+    (repoGraphData?.nodes || []).map((node) => ({
+      ...node,
+      selected: node.id === selectedDependencyNode,
+    }))
+  );
+
+  setFlowEdges(repoGraphData?.edges || []);
+}, [repoGraphData, selectedDependencyNode, setFlowNodes, setFlowEdges]);
+
 const resetDependencyGraph = () => {
   setSelectedDependencyNode(null);
 
   setFlowNodes(
-    dependencyNodesData.map((node) => ({
+    (repoGraphData?.nodes || []).map((node) => ({
       ...node,
       selected: false,
     }))
   );
 
-  setFlowEdges(dependencyEdgesData);
+  setFlowEdges(repoGraphData?.edges || []);
 };
-
   const openFileModal = (file) => {
     setSelectedFile(file);
     setFileViewMode('summary');
@@ -1367,7 +1582,7 @@ const resetDependencyGraph = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -14 }}
             >
-              <DirectoryExplorer onFileClick={openFileModal} />
+              <DirectoryExplorer treeData={repoTreeData} onFileClick={openFileModal} />
             </motion.div>
           )}
 
@@ -1432,35 +1647,47 @@ const resetDependencyGraph = () => {
     </button>
   </div>
 </div>
-
-     <div className="mt-4 overflow-hidden rounded-2xl border border-white/8 bg-[#07090f]">
+<div className="mt-4 overflow-hidden rounded-2xl border border-white/8 bg-[#07090f]">
   <div className="h-[620px] w-full">
-   <ReactFlow
-  nodes={flowNodes}
-  edges={flowEdges}
-  onNodesChange={onNodesChange}
-  onEdgesChange={onEdgesChange}
-  nodeTypes={dependencyNodeTypes}
-  fitView
-  fitViewOptions={{ padding: 0.28 }}
-  minZoom={0.5}
-  maxZoom={1.8}
-  defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-  proOptions={{ hideAttribution: true }}
-  nodesDraggable
-  nodesConnectable={false}
-  elementsSelectable
-  panOnDrag
-  zoomOnScroll
-  zoomOnPinch
-  zoomOnDoubleClick
-  panOnScroll={false}
-  selectionOnDrag={false}
-  onNodeClick={(_, node) => setSelectedDependencyNode(node.id)}
-  onPaneClick={() => setSelectedDependencyNode(null)}
->
-      <Background gap={22} size={1} color="#1f2937" />
-    </ReactFlow>
+    {flowNodes.length === 0 ? (
+      <div className="flex h-full items-center justify-center text-center">
+        <div>
+          <div className="text-base font-semibold text-white">
+            Dependency graph is still processing
+          </div>
+          <div className="mt-2 text-sm text-neutral-500">
+            Backend graph data is still processing, or failed to generate.
+          </div>
+        </div>
+      </div>
+    ) : (
+      <ReactFlow
+        nodes={flowNodes}
+        edges={flowEdges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        nodeTypes={dependencyNodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.28 }}
+        minZoom={0.5}
+        maxZoom={1.8}
+        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+        proOptions={{ hideAttribution: true }}
+        nodesDraggable
+        nodesConnectable={false}
+        elementsSelectable
+        panOnDrag
+        zoomOnScroll
+        zoomOnPinch
+        zoomOnDoubleClick
+        panOnScroll={false}
+        selectionOnDrag={false}
+        onNodeClick={(_, node) => setSelectedDependencyNode(node.id)}
+        onPaneClick={() => setSelectedDependencyNode(null)}
+      >
+        <Background gap={22} size={1} color="#1f2937" />
+      </ReactFlow>
+    )}
   </div>
 </div>
     </div>
@@ -1484,10 +1711,12 @@ const resetDependencyGraph = () => {
 // ==========================
 
 export default function RepositoryIntelligencePage() {
+  const [repoTreeData, setRepoTreeData] = useState([]);
   const [stage, setStage] = useState('upload');
   const [repoUrl, setRepoUrl] = useState('');
   const [showLoadingInsideResults, setShowLoadingInsideResults] = useState(true);
   const [repoId, setRepoId] = useState(null);
+  const [repoGraphData, setRepoGraphData] = useState({ nodes: [], edges: [] });
   const [repoStatus, setRepoStatus] = useState(null);
   const [apiError, setApiError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1508,11 +1737,16 @@ export default function RepositoryIntelligencePage() {
         const currentStatus = statusInfo.status;
 
         setRepoStatus(currentStatus || "processing");
+if (currentStatus === "tree_ready") {
+  await fetchRepoTree(repoId);
+  setShowLoadingInsideResults(false);
+}
 
-        if (currentStatus === "tree_ready" || currentStatus === "success") {
-          setShowLoadingInsideResults(false);
-        }
-
+if (currentStatus === "success") {
+  await fetchRepoTree(repoId);
+  await fetchRepoGraph(repoId);
+  setShowLoadingInsideResults(false);
+}
         if (currentStatus === "error" || currentStatus === "not_found") {
           setApiError(statusInfo.detail || "Repository processing failed.");
           setShowLoadingInsideResults(false);
@@ -1531,6 +1765,56 @@ export default function RepositoryIntelligencePage() {
       ws.close();
     };
   }, [repoId]);
+
+const fetchRepoTree = async (incomingRepoId) => {
+  const token = localStorage.getItem("token");
+  if (!token || !incomingRepoId) return;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/tree/${incomingRepoId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.detail || "Failed to fetch repository tree.");
+    }
+
+    const nestedTree = buildDirectoryTreeFromFlatMap(data);
+    setRepoTreeData(nestedTree);
+  } catch (error) {
+    console.error("Tree fetch error:", error);
+    setRepoTreeData([]);
+  }
+};
+
+const fetchRepoGraph = async (incomingRepoId) => {
+  const token = localStorage.getItem("token");
+  if (!token || !incomingRepoId) return;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/graph/${incomingRepoId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.detail || "Failed to fetch repository graph.");
+    }
+
+    const flowGraph = buildReactFlowGraphFromBackend(data);
+    setRepoGraphData(flowGraph);
+  } catch (error) {
+    console.error("Graph fetch error:", error);
+    setRepoGraphData({ nodes: [], edges: [] });
+  }
+};
 
   const handleAnalyze = async (incomingRepoUrl) => {
     const cleanUrl = incomingRepoUrl.trim();
@@ -1559,6 +1843,8 @@ export default function RepositoryIntelligencePage() {
       setStage("results");
       setShowLoadingInsideResults(true);
       setRepoId(null);
+      setRepoTreeData([]);
+      setRepoGraphData({ nodes: [], edges: [] });
 
       const response = await fetch(`${API_BASE_URL}/api/ingest`, {
         method: "POST",
@@ -1658,7 +1944,10 @@ export default function RepositoryIntelligencePage() {
                 {showLoadingInsideResults ? (
   <LoadingBuffer statusText={repoStatus || "Backend processing in progress..."} />
 ) : (
-  <ResultsStage />
+  <ResultsStage
+  repoTreeData={repoTreeData}
+  repoGraphData={repoGraphData}
+/>
 )}
               </motion.div>
             )}
