@@ -1874,6 +1874,9 @@ const [repoGraphData, setRepoGraphData] = useState({ nodes: [], edges: [] });
 const [repoStatus, setRepoStatus] = useState(null);
 const [apiError, setApiError] = useState("");
 const [isSubmitting, setIsSubmitting] = useState(false);
+const [repoHistory, setRepoHistory] = useState([]);
+const [historyLoading, setHistoryLoading] = useState(false);
+const [historyError, setHistoryError] = useState("");
 
 const fetchRepoSummary = async (incomingRepoId) => {
   const token = localStorage.getItem("token");
@@ -1898,6 +1901,7 @@ const fetchRepoSummary = async (incomingRepoId) => {
     setRepoSummaryData(null);
   }
 };
+
 
   useEffect(() => {
     if (!repoId) return;
