@@ -26,6 +26,8 @@ import {
 } from 'lucide-react';
 import * as Icons from "lucide-react";
 import Sidebar from '../components/sidebar';
+import ReactMarkdown from "react-markdown";
+
 import {
   ReactFlow,
   Background,
@@ -111,7 +113,11 @@ const buildDirectoryTreeFromFlatMap = (flatMap) => {
           type: "file",
           name: part,
           fullPath: filePath,
-          summary: meta?.purpose || "No summary available.",
+          summary:
+  meta?.summary ||
+  meta?.description ||
+  meta?.purpose ||
+  "No summary available.",
           overview: meta?.purpose || "No overview available.",
           responsibilities:
             meta?.key_functions?.length > 0
@@ -1483,7 +1489,12 @@ const dependencyEdgesData = [
     },
   },
 ];
-const ResultsStage = ({ repoTreeData = [], repoGraphData = { nodes: [], edges: [] } }) => {
+const ResultsStage = ({
+  repoId,
+  repoTreeData = [],
+  repoGraphData = { nodes: [], edges: [] },
+  repoSummaryData = null,
+}) => {
   const [activeTab, setActiveTab] = useState('directory');
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileViewMode, setFileViewMode] = useState('summary');
@@ -1522,7 +1533,6 @@ useEffect(() => {
 
   setFlowEdges(repoGraphData?.edges || []);
 }, [repoGraphData, selectedDependencyNode, setFlowNodes, setFlowEdges]);
-
 const resetDependencyGraph = () => {
   setSelectedDependencyNode(null);
 
@@ -1535,10 +1545,73 @@ const resetDependencyGraph = () => {
 
   setFlowEdges(repoGraphData?.edges || []);
 };
-  const openFileModal = (file) => {
-    setSelectedFile(file);
-    setFileViewMode('summary');
-  };
+ const openFileModal = async (file) => {
+  setFileViewMode('summary');
+
+  // Open instantly with fallback summary first
+  setSelectedFile({
+    ...file,
+    summary: file.summary || "Generating summary...",
+  });
+
+  try {
+    const token = localStorage.getItem("token") || localStorage.getItem("access_token");
+
+    const response = await fetch(`${API_BASE_URL}/api/file-summary`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        repo_id: repoId,
+        file_path: file.fullPath,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch file summary");
+    }
+
+    const data = await response.json();
+
+ setSelectedFile((prev) => ({
+  ...prev,
+  ...file,
+  summary:
+    data?.summary ||
+    data?.description ||
+    data?.purpose ||
+    file.summary ||
+    "No summary available.",
+  overview:
+    data?.overview ||
+    data?.summary ||
+    file.overview ||
+    "No overview available.",
+  responsibilities:
+    data?.responsibilities ||
+    file.responsibilities ||
+    [],
+  insights:
+    data?.insights ||
+    file.insights ||
+    "No insights available.",
+  code:
+    data?.code ||
+    file.code ||
+    "",
+}));
+  } catch (error) {
+    console.error("File summary fetch error:", error);
+
+    setSelectedFile((prev) => ({
+      ...prev,
+      ...file,
+      summary: file.summary || "Failed to fetch summary.",
+    }));
+  }
+};
 
   const closeFileModal = () => {
     setSelectedFile(null);
@@ -1587,32 +1660,112 @@ const resetDependencyGraph = () => {
           )}
 
           {activeTab === 'summary' && (
-            <motion.div
-              key="summary"
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -14 }}
-              className="space-y-4"
+  <motion.div
+    key="summary"
+    initial={{ opacity: 0, y: 14 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -14 }}
+    className="space-y-4"
+  >
+    {!repoSummaryData ? (
+      <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-5 text-neutral-400 leading-7">
+        Summary is not available yet.
+      </div>
+    ) : (
+      <>
+        {(repoSummaryData?.analysis?.sections?.sections || []).length > 0 ? (
+          repoSummaryData.analysis.sections.sections.map((section) => (
+            <div
+              key={section.id}
+              className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-5"
             >
-              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-5 text-neutral-300 leading-7">
-                This repository appears to be a modern React frontend with a clean page-based flow.
-                It is focused on repository submission, loading animation, and technical visualization.
-                The code structure is modular, component-driven, and designed for an advanced UI experience.
+              <div
+  className={`mb-3 text-sm font-semibold uppercase tracking-[0.18em] ${
+    section.title.toLowerCase().includes("purpose")
+      ? "text-blue-400"
+      : section.title.toLowerCase().includes("methodology")
+      ? "text-white"
+      : section.title.toLowerCase().includes("tech")
+      ? "text-emerald-400"
+      : "text-purple-300"
+  }`}
+>
+  {section.title}
+</div>
+             <div className="prose prose-invert max-w-none">
+  <ReactMarkdown
+    components={{
+      h1: ({ children }) => (
+        <h1 className="text-2xl font-bold text-blue-400 mb-3">
+          {children}
+        </h1>
+      ),
+      h2: ({ children }) => (
+        <h2 className="text-xl font-semibold text-purple-300 mb-2">
+          {children}
+        </h2>
+      ),
+      h3: ({ children }) => (
+        <h3 className="text-lg font-semibold text-cyan-300 mb-2">
+          {children}
+        </h3>
+      ),
+      strong: ({ children }) => (
+        <span className="font-bold text-white">
+          {children}
+        </span>
+      ),
+      p: ({ children }) => (
+        <p className="text-neutral-300 leading-7 mb-2">
+          {children}
+        </p>
+      ),
+      li: ({ children }) => (
+        <li className="text-neutral-300 ml-4 list-disc">
+          {children}
+        </li>
+      ),
+    }}
+  >
+    {section.content}
+  </ReactMarkdown>
+</div>
+            </div>
+          ))
+        ) : (
+          <>
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-5">
+              <div className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-purple-300">
+                Project Purpose
               </div>
+              <div className="whitespace-pre-line text-neutral-300 leading-7">
+                {repoSummaryData?.analysis?.structured?.project_purpose || "No project purpose available."}
+              </div>
+            </div>
 
-              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-5 text-neutral-300 leading-7">
-                Key traits:
-                <br />
-                • Reusable UI components
-                <br />
-                • Animation-heavy experience using Framer Motion
-                <br />
-                • Dashboard-like results presentation
-                <br />
-                • Easy to extend into real backend-powered repo analysis
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-5">
+              <div className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-purple-300">
+                Coding Methodology
               </div>
-            </motion.div>
-          )}
+              <div className="whitespace-pre-line text-neutral-300 leading-7">
+                {repoSummaryData?.analysis?.structured?.coding_methodology || "No coding methodology available."}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-5">
+              <div className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-purple-300">
+                Tech Stack & Additional Insight
+              </div>
+              <div className="whitespace-pre-line text-neutral-300 leading-7">
+                {repoSummaryData?.analysis?.structured?.tech_stack_and_insight || "No tech stack insight available."}
+              </div>
+            </div>
+          </>
+        )}
+      </>
+    )}
+  </motion.div>
+)}
 
           {activeTab === 'dependencies' && (
   <motion.div
@@ -1712,14 +1865,39 @@ const resetDependencyGraph = () => {
 
 export default function RepositoryIntelligencePage() {
   const [repoTreeData, setRepoTreeData] = useState([]);
-  const [stage, setStage] = useState('upload');
-  const [repoUrl, setRepoUrl] = useState('');
-  const [showLoadingInsideResults, setShowLoadingInsideResults] = useState(true);
-  const [repoId, setRepoId] = useState(null);
-  const [repoGraphData, setRepoGraphData] = useState({ nodes: [], edges: [] });
-  const [repoStatus, setRepoStatus] = useState(null);
-  const [apiError, setApiError] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+const [repoSummaryData, setRepoSummaryData] = useState(null);
+const [stage, setStage] = useState('upload');
+const [repoUrl, setRepoUrl] = useState('');
+const [showLoadingInsideResults, setShowLoadingInsideResults] = useState(true);
+const [repoId, setRepoId] = useState(null);
+const [repoGraphData, setRepoGraphData] = useState({ nodes: [], edges: [] });
+const [repoStatus, setRepoStatus] = useState(null);
+const [apiError, setApiError] = useState("");
+const [isSubmitting, setIsSubmitting] = useState(false);
+
+const fetchRepoSummary = async (incomingRepoId) => {
+  const token = localStorage.getItem("token");
+  if (!token || !incomingRepoId) return;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/summary/${incomingRepoId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.detail || "Failed to fetch repository summary.");
+    }
+
+    setRepoSummaryData(data);
+  } catch (error) {
+    console.error("Summary fetch error:", error);
+    setRepoSummaryData(null);
+  }
+};
 
   useEffect(() => {
     if (!repoId) return;
@@ -1745,6 +1923,7 @@ if (currentStatus === "tree_ready") {
 if (currentStatus === "success") {
   await fetchRepoTree(repoId);
   await fetchRepoGraph(repoId);
+  await fetchRepoSummary(repoId);
   setShowLoadingInsideResults(false);
 }
         if (currentStatus === "error" || currentStatus === "not_found") {
@@ -1845,6 +2024,7 @@ const fetchRepoGraph = async (incomingRepoId) => {
       setRepoId(null);
       setRepoTreeData([]);
       setRepoGraphData({ nodes: [], edges: [] });
+      setRepoSummaryData(null);
 
       const response = await fetch(`${API_BASE_URL}/api/ingest`, {
         method: "POST",
@@ -1944,9 +2124,11 @@ const fetchRepoGraph = async (incomingRepoId) => {
                 {showLoadingInsideResults ? (
   <LoadingBuffer statusText={repoStatus || "Backend processing in progress..."} />
 ) : (
-  <ResultsStage
+<ResultsStage
+  repoId={repoId}
   repoTreeData={repoTreeData}
   repoGraphData={repoGraphData}
+  repoSummaryData={repoSummaryData}
 />
 )}
               </motion.div>
