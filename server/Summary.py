@@ -1,7 +1,7 @@
 import json
 import os
 import re
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
@@ -81,7 +81,7 @@ IMPORTANT RULES:
 
 # --- CORE FUNCTIONS ---
 
-def build_chain(system_prompt: str, llm: ChatGoogleGenerativeAI):
+def build_chain(system_prompt: str, llm: ChatGroq):
     """Build a simple LangChain chain: prompt → LLM → string output."""
     prompt = ChatPromptTemplate.from_messages([("system", system_prompt), ("human", "{input}")])
     return prompt | llm | StrOutputParser()
@@ -100,7 +100,7 @@ def _extract_summary_sections(report_text: str) -> dict:
     }
 
 def get_detailed_report(repo_context: dict) -> dict:
-    llm = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0, max_retries=5)
+    llm = ChatGroq(model_name="openai/gpt-oss-120b", temperature=0, max_retries=5)
     
     structural_profiles = (
         "Below is the complete JSON metadata for the entire codebase.\n\nREPOSITORY DATA:\n" 
