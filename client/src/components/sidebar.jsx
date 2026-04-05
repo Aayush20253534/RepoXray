@@ -22,6 +22,10 @@ const Sidebar = () => {
   const [search, setSearch] = useState("");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // New state variables for backend integration
+  const [historyData, setHistoryData] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const location = useLocation();
 
@@ -36,12 +40,42 @@ const Sidebar = () => {
     );
   }, [isCollapsed]);
 
-  const historyData = [
-    { id: 1, name: "React Repo Analyzer" },
-    { id: 2, name: "Node Backend Project" },
-    { id: 3, name: "AI Repo Scanner" },
-    { id: 4, name: "Portfolio Website" },
-  ];
+  // Fetch history data from backend
+  useEffect(() => {
+    const fetchHistory = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      setIsLoadingHistory(true);
+      try {
+        const response = await fetch("http://localhost:8000/api/my-repos", {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Map backend response (repo_id, repo_name) to frontend format
+          const formattedHistory = data.repositories.map(repo => ({
+            id: repo.repo_id,
+            name: repo.repo_name
+          }));
+          setHistoryData(formattedHistory);
+        } else {
+          console.error("Failed to fetch history");
+        }
+      } catch (error) {
+        console.error("Error fetching repository history:", error);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    fetchHistory();
+  }, []);
 
   const filteredHistory = historyData.filter((item) =>
     item.name.toLowerCase().includes(search.toLowerCase())
@@ -166,14 +200,21 @@ const Sidebar = () => {
           <div className="mt-4 flex-1 overflow-y-auto px-3">
             <p className="mb-2 text-xs text-gray-500">History</p>
 
-            {filteredHistory.map((item) => (
-              <button
-                key={item.id}
-                className="w-full truncate rounded-lg px-2 py-2 text-left text-sm text-gray-400 hover:bg-white/5 hover:text-white"
-              >
-                {item.name}
-              </button>
-            ))}
+            {isLoadingHistory ? (
+              <p className="text-xs text-gray-400 px-2">Loading...</p>
+            ) : filteredHistory.length > 0 ? (
+              filteredHistory.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => console.log(`Maps to repo: ${item.id}`)}
+                  className="w-full truncate rounded-lg px-2 py-2 text-left text-sm text-gray-400 hover:bg-white/5 hover:text-white"
+                >
+                  {item.name}
+                </button>
+              ))
+            ) : (
+              <p className="text-xs text-gray-400 px-2">No repositories found.</p>
+            )}
           </div>
         )}
 

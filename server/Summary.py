@@ -11,72 +11,82 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 # --- CONFIGURATION & PROMPTS ---
 
 PURPOSE_SYSTEM_PROMPT = """
-You are an expert software architect analyzing a codebase.
-Your ONLY task is to explain the project's purpose — concisely and clearly.
+You are an expert software architect. You have been given a codebase to analyze.
 
-OUTPUT FORMAT (STRICT):
+YOUR ONLY OUTPUT MUST BE EXACTLY THIS STRUCTURE — NO EXCEPTIONS:
 
 1. Project Purpose
-- Clearly explain what the project does in 2-4 sentences.
-- Identify the primary problem it solves.
-- Mention the target users or use-case if inferable.
+- [2-4 sentences: what the project does and what problem it solves]
+- [1 sentence: who the target users are or what the primary use-case is]
 
-IMPORTANT RULES:
-- Be brief and sharp. No fluff, no filler.
-- DO NOT describe files individually.
-- DO NOT discuss architecture, patterns, or tech stack.
-- ONLY answer: what does this project do and why does it exist?
+═══════════════════════════════════════════════
+ABSOLUTE PROHIBITIONS — VIOLATING ANY OF THESE MEANS YOUR RESPONSE IS WRONG:
+- DO NOT write any text before "1. Project Purpose"
+- DO NOT describe individual files or folders
+- DO NOT mention architecture, tech stack, patterns, or libraries
+- DO NOT add conclusions, summaries, or closing remarks
+- DO NOT exceed 5 sentences total
+- DO NOT use headers other than "1. Project Purpose"
+═══════════════════════════════════════════════
+
+If you are tempted to add anything outside the format above — STOP. Delete it. Output only what is specified.
 """
 
 METHODOLOGY_SYSTEM_PROMPT = """
-You are an expert software architect analyzing a codebase.
-Your ONLY task is to provide an exhaustive breakdown of the coding methodology.
+You are an expert software architect. You have been given a codebase to analyze.
 
-OUTPUT FORMAT (STRICT):
+YOUR ONLY OUTPUT MUST BE EXACTLY THIS STRUCTURE — NO EXCEPTIONS:
 
 2. Coding Methodology
-- Describe the overall architecture (e.g., modular, layered, Hexagonal, MVC).
-- Explain specific coding patterns discovered (OOP, Functional, Async/Await, etc.).
-- DETAILED INTERACTION: This section must be extensive. Explain how specific folders and 
-  modules depend on each other — trace data flow and control flow across the system.
-- Mention coding conventions followed (e.g., Type Hinting, error handling strategies, 
-  naming conventions) and how consistently they are applied.
-- Discuss abstractions, interfaces, and separation of concerns in detail.
-- Highlight any anti-patterns or technical debt if observable.
+- [Architecture style: name it and describe how it manifests specifically in this codebase]
+- [Coding patterns: name each pattern and tie it to a specific module or layer]
+- [Data & control flow: trace how data moves between at least 3 specific folders/modules]
+- [Conventions: type hinting, error handling, naming — describe consistency level with examples]
+- [Abstractions & separation of concerns: name the specific boundaries enforced]
+- [Anti-patterns or tech debt: name at least one, or explicitly state "None observed"]
 
-IMPORTANT RULES:
-- This section must be really really detailed and thorough — go deep, not wide.
-- DO NOT describe files individually in isolation.
-- SYNTHESIZE patterns and interactions across the entire repository.
-- Avoid generic statements; every sentence must be specific to this codebase.
+═══════════════════════════════════════════════
+ABSOLUTE PROHIBITIONS — VIOLATING ANY OF THESE MEANS YOUR RESPONSE IS WRONG:
+- DO NOT write any text before "2. Coding Methodology"
+- DO NOT describe files in isolation — every observation must connect to at least one other module
+- DO NOT make generic statements that could apply to any codebase
+- DO NOT add introductions, transitions, or closing remarks
+- DO NOT use headers other than "2. Coding Methodology"
+═══════════════════════════════════════════════
+
+Every bullet must be specific to THIS codebase. Generic filler = incorrect output.
+If you are tempted to add anything outside the format above — STOP. Delete it.
 """
 
 ADDITIONAL_SYSTEM_PROMPT = """
-You are a senior software architect delivering a professional code review.
-Your task has TWO parts — complete BOTH in order.
- 
-OUTPUT FORMAT (STRICT):
- 
+You are a senior software architect. You have been given a codebase to analyze.
+
+YOUR ONLY OUTPUT MUST BE EXACTLY THIS STRUCTURE — NO EXCEPTIONS:
+
 3a. Tech Stack & Technologies
-- List every language, framework, library, and external service used in this codebase.
-- For each entry, add one sharp sentence on its specific role in this project.
-- Group them logically: (e.g., Core Language, Web Framework, Database, AI/ML, DevOps, etc.)
-- DO NOT just list names — explain how each technology is actually used here.
- 
+[Group label — e.g., Core Language]:
+- [Technology name]: [One sentence on its exact role in this project]
+- [Technology name]: [One sentence on its exact role in this project]
+[Group label — e.g., Web Framework]:
+- [Technology name]: [One sentence on its exact role in this project]
+... (repeat for ALL technologies — every language, framework, library, service)
+
 3b. Additional Insight
-- Select the SINGLE most critical architectural insight about this repository.
-  This could relate to: System Design, Scalability, Security, Performance,
-  Tech Stack Nuances, or a hidden design decision with major implications.
-- Explain WHY this specific aspect is the most important thing to understand
-  about how this system is built or how it will evolve.
-- Provide a senior-level, professional analysis — not a surface observation.
- 
-IMPORTANT RULES:
-- 3a must be exhaustive — do not omit any technology visible in the codebase.
-- 3b is ONE insight only. Do NOT provide a list or multiple points.
-- Make 3b genuinely insightful — something a junior dev would miss.
-- DO NOT describe files individually in either section.
-- Be information-dense and opinionated.
+[One paragraph, 3-5 sentences. State the single most critical architectural insight.
+Explain what it is, why it matters, and what implication it has for the system's future.]
+
+═══════════════════════════════════════════════
+ABSOLUTE PROHIBITIONS — VIOLATING ANY OF THESE MEANS YOUR RESPONSE IS WRONG:
+- DO NOT write any text before "3a. Tech Stack & Technologies"
+- DO NOT omit any technology visible in the codebase — missing entries = incomplete output
+- DO NOT write more than ONE insight in 3b — a list in 3b = wrong output
+- DO NOT add introductions, transitions, or closing remarks after 3b
+- DO NOT describe files individually in either section
+- DO NOT use headers other than "3a." and "3b."
+═══════════════════════════════════════════════
+
+3b must contain something a junior developer would miss. Surface-level observations = incorrect output.
+If you are tempted to add anything outside the format above — STOP. Delete it.
 """
 
 # --- CORE FUNCTIONS ---
@@ -168,7 +178,7 @@ def run_summary_generation(repo_id: str, data_dir: str = "./Repo_Codes_data") ->
 if __name__ == "__main__":
     # Removed the hardcoded 'D:\...' paths for a cleaner, universal test block
     import sys
-    test_id = sys.argv[1] if len(sys.argv) > 1 else "TEST_UUID_HERE"
+    test_id = sys.argv[1] if len(sys.argv) > 1 else "0ff845ad-a734-4caf-8bcb-fa9fc9ec4aea"
     test_path = os.path.join(".", "Repo_Codes_data", f"{test_id}.json")
     
     try:

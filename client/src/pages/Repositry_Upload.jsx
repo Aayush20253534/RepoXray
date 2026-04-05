@@ -927,6 +927,9 @@ const responsibilities = getResponsibilities(file);
 const insights = getInsights(file);
 const codeLines = file.code?.split('\n').length || 0;
 
+const safeSummary = file.summary || "No one-line summary available.";
+const safeCode = file.code || "// No raw code available.";
+
 const [question, setQuestion] = useState('');
 const [submittedQuestion, setSubmittedQuestion] = useState('');
 const [showAnswer, setShowAnswer] = useState(false);
@@ -1009,9 +1012,9 @@ const handleAsk = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
-  <span className="text-sm text-neutral-200 truncate">
-    {file.summary}
-  </span>
+ <span className="text-sm text-neutral-200 truncate">
+  {file.isLoadingSummary ? "Generating one-line summary..." : safeSummary}
+</span>
 </div>
 
                     <div className="my-2 h-px w-full bg-white/10" />
@@ -1064,152 +1067,160 @@ const handleAsk = () => {
               </div>
 
               <AnimatePresence mode="wait">
-                {viewMode === 'summary' ? (
-                  <motion.div
-                    key="summary-view"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    className="h-[260px] overflow-y-auto px-5 py-4 text-sm leading-7 text-neutral-300"
-                  >
-                    <div className="space-y-4">
-                      <div className="rounded-xl border border-white/6 bg-white/[0.03] p-4">
-                        <div className="mb-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
-                          Overview
-                        </div>
-                        <p>{overview}</p>
-                      </div>
-
-                      <div className="rounded-xl border border-white/6 bg-white/[0.03] p-4">
-                        <div className="mb-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
-                          Responsibilities
-                        </div>
-                        <ul className="list-disc pl-5 space-y-1 text-sm text-neutral-300">
-                          {responsibilities.map((item, index) => (
-                            <li key={`${item}-${index}`}>{item}</li>
-                          ))}
-                        </ul>
-                      </div>
-<div className="rounded-xl border border-white/6 bg-white/[0.03] p-4">
-  <div className="mb-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
-    Insights
-  </div>
-  <p className="text-sm text-neutral-300">
-    {insights}
-  </p>
-</div>
-
-<div className="overflow-hidden rounded-2xl border border-cyan-500/15 bg-[linear-gradient(180deg,rgba(34,211,238,0.07),rgba(255,255,255,0.02))]">
-  <div className="border-b border-white/8 px-4 py-3">
-    <div className="flex items-center gap-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-500/10">
-        <Search className="h-4 w-4 text-cyan-300" />
-      </div>
-
-      <div className="min-w-0">
-        <div className="text-sm font-semibold text-white">Ask about this file</div>
-        <div className="text-xs text-neutral-400">
-          Type a question and press Enter or click Ask
+               {viewMode === 'summary' ? (
+  <motion.div
+    key="summary-view"
+    initial={{ opacity: 0, y: 8 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -8 }}
+    className="h-[260px] overflow-y-auto px-5 py-4 text-sm leading-7 text-neutral-300"
+  >
+    <div className="space-y-4">
+      <div className="rounded-xl border border-white/6 bg-white/[0.03] p-4">
+        <div className="mb-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
+          Overview
         </div>
-      </div>
-    </div>
-  </div>
-
-  <div className="p-4">
-    <div className="flex flex-col gap-3 md:flex-row">
-      <div className="relative flex-1">
-        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
-        <input
-          type="text"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleAsk();
-            }
-          }}
-          placeholder="What does this file do? Why is it important? What are its responsibilities?"
-          className="w-full rounded-2xl border border-white/10 bg-[#0b0f17] py-3.5 pl-11 pr-4 text-sm text-white outline-none transition-all placeholder:text-neutral-500 focus:border-cyan-400/40 focus:ring-2 focus:ring-cyan-500/20"
-        />
-      </div>
-
-      <button
-        type="button"
-        onClick={handleAsk}
-        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-5 py-3 text-sm font-semibold text-cyan-300 transition-all hover:border-cyan-300/40 hover:bg-cyan-500/15 hover:text-white"
-      >
-        <ArrowRight className="h-4 w-4" />
-        Ask
-      </button>
-    </div>
-
-    <div className="mt-3 flex flex-wrap gap-2">
-      {['What does this file do?', 'What are its responsibilities?', 'Why is it important?'].map((sample) => (
-        <button
-          key={sample}
-          type="button"
-          onClick={() => {
-            setQuestion(sample);
-            setSubmittedQuestion(sample);
-            setShowAnswer(true);
-          }}
-          className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-neutral-300 transition hover:border-cyan-400/30 hover:bg-cyan-500/10 hover:text-white"
-        >
-          {sample}
-        </button>
-      ))}
-    </div>
-
-    {showAnswer && submittedQuestion.trim() && (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mt-4 rounded-2xl border border-cyan-500/20 bg-[#0b1220] p-4 shadow-[0_0_24px_rgba(34,211,238,0.08)]"
-      >
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-300">
-            Answer
-          </div>
-          <div className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] text-neutral-400">
-            {file.name}
-          </div>
-        </div>
-
-        <p className="text-sm leading-7 text-neutral-200">
-          {generatedAnswer}
+        <p>
+          {file.isLoadingSummary ? "Generating overview..." : overview}
         </p>
-      </motion.div>
-    )}
+      </div>
+
+      <div className="rounded-xl border border-white/6 bg-white/[0.03] p-4">
+        <div className="mb-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
+          Responsibilities
+        </div>
+
+        {file.isLoadingSummary ? (
+          <p className="text-sm text-neutral-400">Generating responsibilities...</p>
+        ) : responsibilities?.length > 0 ? (
+          <ul className="list-disc pl-5 space-y-1 text-sm text-neutral-300">
+            {responsibilities.map((item, index) => (
+              <li key={`${item}-${index}`}>{item}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-neutral-400">No responsibilities available.</p>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-white/6 bg-white/[0.03] p-4">
+        <div className="mb-2 text-xs uppercase tracking-[0.2em] text-neutral-500">
+          Insights
+        </div>
+        <p className="text-sm text-neutral-300">
+          {file.isLoadingSummary ? "Generating insights..." : insights}
+        </p>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-cyan-500/15 bg-[linear-gradient(180deg,rgba(34,211,238,0.07),rgba(255,255,255,0.02))]">
+        <div className="border-b border-white/8 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-500/10">
+              <Search className="h-4 w-4 text-cyan-300" />
+            </div>
+
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-white">Ask about this file</div>
+              <div className="text-xs text-neutral-400">
+                Type a question and press Enter or click Ask
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4">
+          <div className="flex flex-col gap-3 md:flex-row">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+              <input
+                type="text"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAsk();
+                  }
+                }}
+                placeholder="What does this file do? Why is it important? What are its responsibilities?"
+                className="w-full rounded-2xl border border-white/10 bg-[#0b0f17] py-3.5 pl-11 pr-4 text-sm text-white outline-none transition-all placeholder:text-neutral-500 focus:border-cyan-400/40 focus:ring-2 focus:ring-cyan-500/20"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAsk}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-5 py-3 text-sm font-semibold text-cyan-300 transition-all hover:border-cyan-300/40 hover:bg-cyan-500/15 hover:text-white"
+            >
+              <ArrowRight className="h-4 w-4" />
+              Ask
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {['What does this file do?', 'What are its responsibilities?', 'Why is it important?'].map((sample) => (
+              <button
+                key={sample}
+                type="button"
+                onClick={() => {
+                  setQuestion(sample);
+                  setSubmittedQuestion(sample);
+                  setShowAnswer(true);
+                }}
+                className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-neutral-300 transition hover:border-cyan-400/30 hover:bg-cyan-500/10 hover:text-white"
+              >
+                {sample}
+              </button>
+            ))}
+          </div>
+
+          {showAnswer && submittedQuestion.trim() && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 rounded-2xl border border-cyan-500/20 bg-[#0b1220] p-4 shadow-[0_0_24px_rgba(34,211,238,0.08)]"
+            >
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-300">
+                  Answer
+                </div>
+                <div className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] text-neutral-400">
+                  {file.name}
+                </div>
+              </div>
+
+              <p className="text-sm leading-7 text-neutral-200">
+                {generatedAnswer}
+              </p>
+            </motion.div>
+          )}
+        </div>
+      </div>
+    </div>
+  </motion.div>
+) : (
+                  <motion.div
+  key="code-view"
+  initial={{ opacity: 0, y: 8 }}
+  animate={{ opacity: 1, y: 0 }}
+  exit={{ opacity: 0, y: -8 }}
+  className="h-[260px] overflow-auto bg-[#0b1020]"
+>
+  <div className="mb-0 flex items-center justify-between border-b border-white/6 px-4 py-3">
+    <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[11px] text-emerald-400">
+      {file.name}
+    </div>
+
+    <div className="rounded-3xl border border-purple-500/20 bg-purple-500/10 px-3 py-1 text-[11px] text-purple-300">
+      {codeLines} lines
+    </div>
   </div>
-</div>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <motion.pre
-                    key="code-view"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    className="h-[260px] overflow-auto px-5 py-4 font-mono text-sm leading-7 text-cyan-200"
-                  >
-                    <>
-               <div className="mb-4 flex items-center justify-between">
 
-  {/* File Name Card (LEFT) */}
-  <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-0.3 text-[11px] text-emerald-400">
-    {file.name}
-  </div>
-
-  {/* Lines Card (RIGHT) */}
-  <div className="rounded-3xl border border-purple-500/20 bg-purple-500/10 px-3 py-0.3 text-[11px] text-purple-300">
-    {codeLines} lines
-  </div>
-
-</div>
-
-                      <code>{file.code}</code>
-                    </>
-                  </motion.pre>
+  <pre className="m-0 whitespace-pre-wrap break-words px-5 py-4 font-mono text-sm leading-7 text-cyan-200">
+    <code>
+      {file.isLoadingCode ? "Fetching raw code from backend..." : safeCode}
+    </code>
+  </pre>
+</motion.div>
                 )}
               </AnimatePresence>
             </div>
@@ -1546,73 +1557,113 @@ const resetDependencyGraph = () => {
   setFlowEdges(repoGraphData?.edges || []);
 };
  const openFileModal = async (file) => {
-  setFileViewMode('summary');
+  setFileViewMode("summary");
 
-  // Open instantly with fallback summary first
   setSelectedFile({
     ...file,
-    summary: file.summary || "Generating summary...",
+    summary: file.summary || "Generating one-line summary...",
+    overview: file.overview || "Generating overview...",
+    responsibilities: file.responsibilities || [],
+    insights: file.insights || "Generating insights...",
+    code: file.code || "",
+    isLoadingSummary: true,
+    isLoadingCode: true,
   });
 
   try {
-    const token = localStorage.getItem("token") || localStorage.getItem("access_token");
+    const token =
+      localStorage.getItem("token") || localStorage.getItem("access_token");
 
-    const response = await fetch(`${API_BASE_URL}/api/file-summary`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        repo_id: repoId,
-        file_path: file.fullPath,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch file summary");
+    if (!token) {
+      throw new Error("No auth token found");
     }
 
-    const data = await response.json();
+    const encodedPath = encodeURIComponent(file.fullPath);
 
- setSelectedFile((prev) => ({
-  ...prev,
-  ...file,
-  summary:
-    data?.summary ||
-    data?.description ||
-    data?.purpose ||
-    file.summary ||
-    "No summary available.",
-  overview:
-    data?.overview ||
-    data?.summary ||
-    file.overview ||
-    "No overview available.",
-  responsibilities:
-    data?.responsibilities ||
-    file.responsibilities ||
-    [],
-  insights:
-    data?.insights ||
-    file.insights ||
-    "No insights available.",
-  code:
-    data?.code ||
-    file.code ||
-    "",
-}));
-  } catch (error) {
-    console.error("File summary fetch error:", error);
+    const [summaryRes, codeRes] = await Promise.allSettled([
+      fetch(`${API_BASE_URL}/api/file-summary`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          repo_id: repoId,
+          file_path: file.fullPath,
+        }),
+      }),
+      fetch(`${API_BASE_URL}/api/file-code/${repoId}?file_path=${encodedPath}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }),
+    ]);
+
+    let summaryData = null;
+    let codeData = null;
+
+    if (summaryRes.status === "fulfilled" && summaryRes.value.ok) {
+      summaryData = await summaryRes.value.json();
+    }
+
+    if (codeRes.status === "fulfilled" && codeRes.value.ok) {
+      codeData = await codeRes.value.json();
+    }
 
     setSelectedFile((prev) => ({
       ...prev,
       ...file,
-      summary: file.summary || "Failed to fetch summary.",
+      summary:
+        summaryData?.summary ||
+        summaryData?.description ||
+        summaryData?.purpose ||
+        file.summary ||
+        "No summary available.",
+      overview:
+        summaryData?.overview ||
+        summaryData?.purpose ||
+        summaryData?.summary ||
+        file.overview ||
+        "No overview available.",
+      responsibilities:
+        summaryData?.responsibilities ||
+        summaryData?.key_functions?.map((fn) => `Contains or exposes: ${fn}`) ||
+        file.responsibilities ||
+        [],
+      insights:
+        summaryData?.insights ||
+        `Role: ${summaryData?.project_role || file?.metadata?.project_role || "other"} • Libraries: ${
+          summaryData?.libraries_used?.length
+            ? summaryData.libraries_used.join(", ")
+            : file?.metadata?.libraries_used?.length
+            ? file.metadata.libraries_used.join(", ")
+            : "None detected"
+        }`,
+      code:
+        codeData?.code ||
+        summaryData?.code ||
+        file.code ||
+        "// Raw code not available.",
+      isLoadingSummary: false,
+      isLoadingCode: false,
+    }));
+  } catch (error) {
+    console.error("File popup fetch error:", error);
+
+    setSelectedFile((prev) => ({
+      ...prev,
+      ...file,
+      summary: file.summary || "Failed to fetch one-line summary.",
+      overview: file.overview || "Failed to fetch overview.",
+      responsibilities: file.responsibilities || [],
+      insights: file.insights || "Failed to fetch insights.",
+      code: file.code || "// Failed to fetch raw code.",
+      isLoadingSummary: false,
+      isLoadingCode: false,
     }));
   }
 };
-
   const closeFileModal = () => {
     setSelectedFile(null);
   };
