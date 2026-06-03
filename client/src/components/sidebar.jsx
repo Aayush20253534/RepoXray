@@ -48,7 +48,7 @@ const Sidebar = () => {
 
       setIsLoadingHistory(true);
       try {
-        const response = await fetch("http://localhost:8000/api/my-repos", {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/my-repos`, {
           method: "GET",
           headers: {
             "Authorization": `Bearer ${token}`,
